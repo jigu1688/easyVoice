@@ -12,11 +12,17 @@ interface TTSResult {
 interface TTSParams {
   text: string
   voice: string
-  volume: string
-  rate: string
-  pitch: string
+  volume?: string
+  rate?: string
+  pitch?: string
   output: string
+  ttsProvider?: string
+  azureKey?: string
+  azureRegion?: string
+  openaiTtsKey?: string
+  openaiTtsBaseUrl?: string
 }
 type BuildSegment = TTSParams & {
   text: string
 }
+

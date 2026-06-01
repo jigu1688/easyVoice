@@ -34,6 +34,19 @@ export async function runEdgeTTS({
   }
   return tts.ttsPromise(text, { audioPath: output, outputType: outputType as any })
 }
+import { runAzureTTS } from './azure-tts.service'
+import { runOpenAITTS } from './openai-tts.service'
+
+export async function runTTS(params: any) {
+  if (params.ttsProvider === 'azure') {
+    return runAzureTTS(params)
+  } else if (params.ttsProvider === 'openai') {
+    return runOpenAITTS(params)
+  } else {
+    return runEdgeTTS(params)
+  }
+}
+
 export const generateSingleVoice = async (
   params: Omit<EdgeSchema, 'useLLM'> & { output: string }
 ) => {
@@ -43,7 +56,7 @@ export const generateSingleVoice = async (
   }
   await safeRunWithRetry(
     async () => {
-      result = (await runEdgeTTS({ ...params })) as TTSResult
+      result = (await runTTS({ ...params })) as TTSResult
     },
     { retries: 5 }
   )
@@ -52,7 +65,7 @@ export const generateSingleVoice = async (
 export const generateSingleVoiceStream = async (
   params: Omit<EdgeSchema, 'useLLM'> & { output: string; outputType?: string }
 ) => {
-  return runEdgeTTS({ ...params, outputType: 'stream' })
+  return runTTS({ ...params, outputType: 'stream' })
 }
 
 // 定义字幕数据的类型

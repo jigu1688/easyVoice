@@ -618,6 +618,54 @@
             />
           </el-select>
         </el-form-item>
+
+        <el-divider>TTS 引擎配置</el-divider>
+
+        <el-form-item label="TTS 服务商">
+          <el-select v-model="audioConfig.ttsProvider" placeholder="选择 TTS 服务商" style="width: 100%">
+            <el-option label="免费 Edge-TTS (内置/免Key)" value="edge" />
+            <el-option label="微软 Azure TTS (收费版)" value="azure" />
+            <el-option label="OpenAI TTS (官方/收费)" value="openai" />
+          </el-select>
+        </el-form-item>
+
+        <template v-if="audioConfig.ttsProvider === 'azure'">
+          <el-form-item label="Azure API Key (订阅密钥)">
+            <el-input
+              v-model="audioConfig.azureKey"
+              type="password"
+              show-password
+              clearable
+              placeholder="请输入 Azure TTS 订阅密钥"
+            />
+          </el-form-item>
+          <el-form-item label="Azure Region (服务区域)">
+            <el-input
+              v-model="audioConfig.azureRegion"
+              clearable
+              placeholder="例如: eastasia, eastus"
+            />
+          </el-form-item>
+        </template>
+
+        <template v-if="audioConfig.ttsProvider === 'openai'">
+          <el-form-item label="OpenAI API Key (语音专用)">
+            <el-input
+              v-model="audioConfig.openaiTtsKey"
+              type="password"
+              show-password
+              clearable
+              placeholder="若为空则默认使用上方的 AI 全局密钥"
+            />
+          </el-form-item>
+          <el-form-item label="OpenAI Base URL (语音专用)">
+            <el-input
+              v-model="audioConfig.openaiTtsBaseUrl"
+              clearable
+              placeholder="例如: https://api.openai.com/v1（支持中转代理）"
+            />
+          </el-form-item>
+        </template>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -1106,6 +1154,14 @@ const buildParams = (text: string) => {
     params.openaiKey = openaiKey
     params.openaiModel = openaiModel
   }
+
+  // 增加 TTS 服务商参数
+  params.ttsProvider = audioConfig.ttsProvider
+  params.azureKey = audioConfig.azureKey
+  params.azureRegion = audioConfig.azureRegion
+  params.openaiTtsKey = audioConfig.openaiTtsKey
+  params.openaiTtsBaseUrl = audioConfig.openaiTtsBaseUrl
+
   return params
 }
 
@@ -1606,6 +1662,11 @@ const toggleVoicePreview = async (voice: Voice) => {
       rate: '+0%',
       pitch: '+0Hz',
       volume: '+0%',
+      ttsProvider: audioConfig.ttsProvider,
+      azureKey: audioConfig.azureKey,
+      azureRegion: audioConfig.azureRegion,
+      openaiTtsKey: audioConfig.openaiTtsKey,
+      openaiTtsBaseUrl: audioConfig.openaiTtsBaseUrl,
     }
 
     const { data } = await generateTTS(params)
@@ -1634,6 +1695,19 @@ const toggleVoicePreview = async (voice: Voice) => {
 
 const filteredMarketVoices = computed(() => {
   return voiceList.value.filter(voice => {
+    // 0. Engine Filter based on ttsProvider
+    const provider = audioConfig.ttsProvider || 'edge'
+    const engine = voice.Engine || 'edge'
+    if (provider === 'edge' && engine !== 'edge') {
+      return false
+    }
+    if (provider === 'azure' && (engine !== 'edge' && engine !== 'azure')) {
+      return false
+    }
+    if (provider === 'openai' && engine !== 'openai') {
+      return false
+    }
+
     // 1. Language Filter
     let langMatch = false
     if (marketCategory.value === 'english') {
@@ -1768,7 +1842,14 @@ const generateMultiAudioTask = async () => {
       }
     })
 
-    const stream = await generateJsonStream({ data: payloadData })
+    const stream = await generateJsonStream({
+      data: payloadData,
+      ttsProvider: audioConfig.ttsProvider,
+      azureKey: audioConfig.azureKey,
+      azureRegion: audioConfig.azureRegion,
+      openaiTtsKey: audioConfig.openaiTtsKey,
+      openaiTtsBaseUrl: audioConfig.openaiTtsBaseUrl,
+    })
     if (!(stream instanceof ReadableStream)) {
       if (stream.code && stream.data) {
         updateAudioList(stream.data)

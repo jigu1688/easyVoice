@@ -111,7 +111,13 @@ async function generateWithLLMStream(task: Task) {
         'LLM response is not an array, please switch to Edge TTS mode or use another model'
       )
     }
-    buildSegmentList(formatLlmSegments(llmSegments), task)
+    buildSegmentList(
+      formatLlmSegments(llmSegments).map((s: any) => ({
+        ...task.fields,
+        ...s,
+      })),
+      task
+    )
   } else {
     const output = resolve(AUDIO_DIR, id)
     let count = 0
@@ -137,6 +143,7 @@ async function generateWithLLMStream(task: Task) {
       }
       for (let segment of formatLlmSegments(llmSegments)) {
         const stream = (await generateSingleVoiceStream({
+          ...task.fields,
           ...segment,
           output,
           outputType: 'stream',

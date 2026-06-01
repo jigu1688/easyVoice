@@ -10,12 +10,14 @@ type ResponseFormat = (typeof RESPONSE_FORMATS)[number]
 export class OpenAITtsEngine implements TTSEngine {
   name = 'openai-tts'
   private apiKey: string
+  private baseUrl: string
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, baseUrl?: string) {
     if (!apiKey) {
       throw new Error('OpenAI TTS requires an API key.')
     }
     this.apiKey = apiKey
+    this.baseUrl = baseUrl ? baseUrl.replace(/\/$/, '') : 'https://api.openai.com/v1'
   }
 
   async synthesize(text: string, options: TtsOptions): Promise<Buffer> {
@@ -30,7 +32,7 @@ export class OpenAITtsEngine implements TTSEngine {
       )
     }
     if (!OPENAI_VOICES.includes(voice as OpenAIVoice)) {
-      throw new Error(`Invalid voice: ${voice}. Supported voices are: ${OPENAI_VOICES.join(', ')}.`)
+      throw new Error(`Invalid voice: ${voice}. Supported voices are: ${OPENAI_VOICES.join(', ')}.`);
     }
     if (speed < 0.25 || speed > 4.0) {
       throw new Error('Speed must be between 0.25 and 4.0.')
@@ -43,9 +45,9 @@ export class OpenAITtsEngine implements TTSEngine {
 
     try {
       const response = await fetcher.post(
-        'https://api.openai.com/v1/audio/speech',
+        `${this.baseUrl}/audio/speech`,
         {
-          model: 'gpt-4o-mini-tts',
+          model: 'tts-1',
           input: text,
           voice,
           speed,

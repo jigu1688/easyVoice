@@ -11,6 +11,11 @@ export const edgeSchema = z.object({
   volume: z.string().optional(),
   rate: z.string().optional(),
   useLLM: z.boolean().default(false),
+  ttsProvider: z.string().optional(),
+  azureKey: z.string().optional(),
+  azureRegion: z.string().optional(),
+  openaiTtsKey: z.string().optional(),
+  openaiTtsBaseUrl: z.string().optional(),
 })
 
 export const llmSchema = z.object({
@@ -40,6 +45,11 @@ const dataItemSchema = z.object({
 
 const jsonSchema = z.object({
   data: z.array(dataItemSchema).min(1, '数据数组不能为空'),
+  ttsProvider: z.string().optional(),
+  azureKey: z.string().optional(),
+  azureRegion: z.string().optional(),
+  openaiTtsKey: z.string().optional(),
+  openaiTtsBaseUrl: z.string().optional(),
 })
 
 // 导出类型（可选）

@@ -46,16 +46,12 @@ export async function generateTTS(params: Required<EdgeSchema>, task?: Task): Pr
 
   let result: TTSResult
   if (useLLM) {
-    result = await generateWithLLM(segment, voiceList, lang, task)
+    result = await generateWithLLM(segment, voiceList, lang, params, task)
   } else {
     result = await generateWithoutLLM(
       segment,
       {
-        text,
-        pitch,
-        voice,
-        rate,
-        volume,
+        ...params,
         output: segment.id,
       },
       task
@@ -80,6 +76,7 @@ async function generateWithLLM(
   segment: Segment,
   voiceList: VoiceConfig[],
   lang: string,
+  params: Required<EdgeSchema>,
   task?: Task
 ): Promise<TTSResult> {
   const { text, id } = segment
@@ -102,7 +99,14 @@ async function generateWithLLM(
         'LLM response is not an array, please switch to Edge TTS mode or use another model'
       )
     }
-    const result = await buildSegmentList(segment, formatLlmSegments(llmSegments), task)
+    const result = await buildSegmentList(
+      segment,
+      formatLlmSegments(llmSegments).map((s: any) => ({
+        ...params,
+        ...s,
+      })),
+      task
+    )
     task?.updateProgress?.(task.id, 100)
     return result
   } else {
@@ -125,7 +129,10 @@ async function generateWithLLM(
       }
       const result = await buildSegmentList(
         { ...segment, id: `[segments:${count}]${segment.id}` },
-        formatLlmSegments(llmSegments)
+        formatLlmSegments(llmSegments).map((s: any) => ({
+          ...params,
+          ...s,
+        }))
       )
       task?.updateProgress?.(task.id, getProgress())
       finalSegments.push(result)
@@ -188,14 +195,10 @@ async function buildSegment(
   dir: string = ''
 ): Promise<TTSResult> {
   const { id, text } = segment
-  const { pitch, voice, rate, volume } = params
   const output = path.resolve(AUDIO_DIR, dir, id)
   const result = await generateSingleVoice({
+    ...params,
     text,
-    pitch,
-    voice,
-    rate,
-    volume,
     output,
   })
   logger.info('Generated single segment:', result)
@@ -244,7 +247,10 @@ async function buildSegmentList(
       fileList.push(cache.audio)
       return cache
     }
-    const result = await generateSingleVoice({ text, pitch, voice, rate, volume, output })
+    const result = await generateSingleVoice({
+      ...segment,
+      output,
+    })
     logger.debug(`Cache miss and generate audio: ${result.audio}, ${result.srt}`)
     fileList.push(result.audio)
     handledLength++

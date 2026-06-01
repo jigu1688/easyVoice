@@ -18,6 +18,11 @@ export interface GenerateRequest {
   openaiBaseUrl?: string
   openaiKey?: string
   openaiModel?: string
+  ttsProvider?: string
+  azureKey?: string
+  azureRegion?: string
+  openaiTtsKey?: string
+  openaiTtsBaseUrl?: string
 }
 export interface TaskRequest {
   id: string
@@ -48,6 +53,7 @@ export type Voice = {
   Gender: string
   ContentCategories: string[]
   VoicePersonalities: string[]
+  Engine?: string
 }
 export interface Task {
   id: string
@@ -141,7 +147,16 @@ export const parseText = async (data: ParseTextRequest) => {
   return response.data
 }
 
-export const generateJsonStream = async (data: { data: any[] }) => {
+export interface GenerateJsonRequest {
+  data: any[]
+  ttsProvider?: string
+  azureKey?: string
+  azureRegion?: string
+  openaiTtsKey?: string
+  openaiTtsBaseUrl?: string
+}
+
+export const generateJsonStream = async (data: GenerateJsonRequest) => {
   const response = await api.post<ReadableStream | ResponseWrapper<GenerateResponse>>(
     `/generateJson`,
     data,

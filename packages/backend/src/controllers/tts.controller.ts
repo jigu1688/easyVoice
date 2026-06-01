@@ -9,7 +9,8 @@ import taskManager from '../utils/taskManager'
 import { getPrompt, getParseOnlyPrompt } from '../llm/prompt/generateSegment'
 import { openai } from '../utils/openai'
 import { getLangConfig, cleanJsonString } from '../utils'
-function formatBody({ text, pitch, voice, volume, rate, useLLM }: EdgeSchema) {
+function formatBody(body: EdgeSchema) {
+  const { text, pitch, voice, volume, rate, useLLM, ttsProvider = 'edge', azureKey = '', azureRegion = '', openaiTtsKey = '', openaiTtsBaseUrl = '' } = body
   const positivePercent = (value: string | undefined) => {
     if (value === '0%' || value === '0' || value === undefined) return '+0%'
     return value
@@ -25,6 +26,11 @@ function formatBody({ text, pitch, voice, volume, rate, useLLM }: EdgeSchema) {
     rate: positivePercent(rate),
     volume: positivePercent(volume),
     useLLM,
+    ttsProvider,
+    azureKey,
+    azureRegion,
+    openaiTtsKey,
+    openaiTtsBaseUrl,
   }
 }
 export async function createTask(req: Request, res: Response, next: NextFunction) {

@@ -16,6 +16,11 @@ export interface AudioConfig {
   openaiModel: string;
   previewAudioUrl: string;
   superLong?: boolean;
+  ttsProvider: 'edge' | 'azure' | 'openai';
+  azureKey: string;
+  azureRegion: string;
+  openaiTtsKey: string;
+  openaiTtsBaseUrl: string;
 }
 
 // 默认配置常量
@@ -34,6 +39,11 @@ const defaultConfig: AudioConfig = {
   openaiModel: '',
   previewAudioUrl: '',
   superLong: false,
+  ttsProvider: 'edge',
+  azureKey: '',
+  azureRegion: 'eastasia',
+  openaiTtsKey: '',
+  openaiTtsBaseUrl: '',
 };
 
 export const useAudioConfigStore = defineStore('audioConfig', () => {

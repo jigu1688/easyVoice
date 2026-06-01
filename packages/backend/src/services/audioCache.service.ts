@@ -5,9 +5,9 @@ import CacheService, { CacheOptions } from './cache.service'
 interface AudioData {
   voice: string
   text: string
-  rate: string
-  pitch: string
-  volume: string
+  rate?: string
+  pitch?: string
+  volume?: string
   audio: string
   srt: string
 }
