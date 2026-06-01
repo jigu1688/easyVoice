@@ -1710,7 +1710,9 @@ const filteredMarketVoices = computed(() => {
 
     // 1. Language Filter
     let langMatch = false
-    if (marketCategory.value === 'english') {
+    if (provider === 'openai') {
+      langMatch = true
+    } else if (marketCategory.value === 'english') {
       langMatch = voice.Name.startsWith('en')
     } else {
       langMatch = voice.Name.startsWith(audioConfig.selectedLanguage)
