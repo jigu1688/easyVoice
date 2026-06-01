@@ -71,7 +71,14 @@ export class OpenAITtsEngine implements TTSEngine {
       } else if (err.response?.status === 429) {
         throw new Error('Rate limit exceeded for OpenAI TTS.')
       }
-      throw new Error(`Failed to synthesize speech: ${err.message}`)
+      let errorMsg = err.message
+      if (err.response?.data) {
+        try {
+          const dataStr = Buffer.from(err.response.data).toString('utf8')
+          errorMsg += ` - Details: ${dataStr}`
+        } catch {}
+      }
+      throw new Error(`Failed to synthesize speech: ${errorMsg}`)
     }
   }
 
