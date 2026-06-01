@@ -246,13 +246,48 @@ export function streamWithLimit(res: Response, filePath: string, bitrate = 128) 
   })
 }
 
-export function escapeSSML(text: string) {
-  return text
+export function escapeSSML(text: string): string {
+  const tagRegex = /<(phoneme|sub)\b([^>]*)>([\s\S]*?)<\/\1>/gi
+  let lastIndex = 0
+  let result = ''
+  let match
+  
+  while ((match = tagRegex.exec(text)) !== null) {
+    const before = text.slice(lastIndex, match.index)
+    result += escapeStandardXML(before)
+    
+    const tagName = match[1]
+    const tagAttrs = match[2]
+    const tagInner = match[3]
+    
+    result += `<${tagName}${tagAttrs}>${escapeStandardXML(tagInner)}</${tagName}>`
+    lastIndex = tagRegex.lastIndex
+  }
+  
+  const after = text.slice(lastIndex)
+  result += escapeStandardXML(after)
+  
+  return result
+}
+
+function escapeStandardXML(str: string): string {
+  return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/'/g, '&apos;')
+}
+
+export function ssmlToPlainText(text: string): string {
+  if (!text) return ''
+  // 1. Replace <sub alias="xxx">yyy</sub> with xxx
+  let cleaned = text.replace(/<sub\b[^>]*\balias="([^"]*)"[^>]*>([\s\S]*?)<\/sub>/gi, '$1')
+  // 2. Replace <phoneme ...>xxx</phoneme> with xxx
+  cleaned = cleaned.replace(/<phoneme\b[^>]*>([\s\S]*?)<\/phoneme>/gi, '$1')
+  // 3. Strip any other XML tags just in case
+  cleaned = cleaned.replace(/<[^>]+>/g, '')
+  return cleaned
 }
 
 export function cleanJsonString(str: string): string {

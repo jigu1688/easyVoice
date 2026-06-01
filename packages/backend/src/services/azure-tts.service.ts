@@ -2,7 +2,7 @@ import * as sdk from 'microsoft-cognitiveservices-speech-sdk'
 import { PassThrough, Readable } from 'stream'
 import fs from 'fs/promises'
 import path from 'path'
-import { ensureDir } from '../utils'
+import { ensureDir, escapeSSML } from '../utils'
 import { generateSrt } from './edge-tts.service'
 
 interface SubLine {
@@ -50,14 +50,7 @@ export async function runAzureTTS(params: any): Promise<Buffer | Readable> {
     })
   }
 
-  const escapeSSML = (str: string) => {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;')
-  }
+
 
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
     <voice name="${voice}">

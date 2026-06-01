@@ -1,6 +1,13 @@
 import { defineStore } from "pinia";
 import { reactive } from "vue";
 
+export interface DictionaryRule {
+  id: string;
+  word: string;
+  type: 'pinyin' | 'alias';
+  value: string;
+}
+
 export interface AudioConfig {
   volume: number;
   rate: number;
@@ -21,6 +28,7 @@ export interface AudioConfig {
   azureRegion: string;
   openaiTtsKey: string;
   openaiTtsBaseUrl: string;
+  dictionaryRules?: DictionaryRule[];
 }
 
 // 默认配置常量
@@ -44,6 +52,7 @@ const defaultConfig: AudioConfig = {
   azureRegion: 'eastasia',
   openaiTtsKey: '',
   openaiTtsBaseUrl: '',
+  dictionaryRules: [],
 };
 
 export const useAudioConfigStore = defineStore('audioConfig', () => {

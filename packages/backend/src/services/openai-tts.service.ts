@@ -2,7 +2,7 @@ import { OpenAITtsEngine } from '../tts/engines/openaiTts'
 import { PassThrough, Readable } from 'stream'
 import fs from 'fs/promises'
 import path from 'path'
-import { ensureDir } from '../utils'
+import { ensureDir, ssmlToPlainText } from '../utils'
 import { generateSrt } from './edge-tts.service'
 
 export async function runOpenAITTS(params: any): Promise<Buffer | Readable> {
@@ -51,7 +51,7 @@ export async function runOpenAITTS(params: any): Promise<Buffer | Readable> {
     }
   }
 
-  const audioBuffer = await engine.synthesize(text, {
+  const audioBuffer = await engine.synthesize(ssmlToPlainText(text), {
     voice: targetVoice,
     speed,
     format: 'mp3',

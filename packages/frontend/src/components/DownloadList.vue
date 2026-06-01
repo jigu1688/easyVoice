@@ -95,7 +95,6 @@
 import { downloadFile } from '@/api/tts'
 import { useGenerationStore } from '@/stores/generation'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { watch } from 'vue'
 import {
   Download,
   CircleCloseFilled,
@@ -106,33 +105,13 @@ import {
   Service,
   WarningFilled,
 } from '@element-plus/icons-vue'
-import { useAudio } from '@/utils/index'
 import type { Audio } from '../stores/generation'
 
 const store = useGenerationStore()
+const emit = defineEmits(['play-toggle'])
 
-const playAudio = async (item: Audio, _: number) => {
-  const audio = useAudio(item.audio)
-  if (audio.isPlaying.value) {
-    audio.pause()
-    item.isPlaying = false
-  } else {
-    try {
-      await audio.play()
-      item.isPlaying = true
-    } catch (err) {
-      if (err instanceof Error && err.name === 'NotSupportedError') {
-        // 处理不支持的场景
-        ElMessage.error('糟糕！音频可能丢失了!')
-      }
-      console.log(`audio.play error`, (err as Error).message)
-    }
-  }
-  watch(audio.isPlaying, (isPlaying) => {
-    if (isPlaying === false) {
-      item.isPlaying = false
-    }
-  })
+const playAudio = (item: Audio, _: number) => {
+  emit('play-toggle', item)
 }
 const commonDownload = (
   item: Audio,

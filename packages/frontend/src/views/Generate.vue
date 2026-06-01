@@ -542,6 +542,12 @@
       >
         生成多人语音
       </el-button>
+      <el-button :disabled="generating" type="warning" size="large" @click="showDictDialog = true">
+        发音词典
+      </el-button>
+      <el-button :disabled="generating" type="info" size="large" @click="showHistoryDrawer = true">
+        历史与草稿
+      </el-button>
       <el-button :disabled="generating" type="danger" size="large" @click="reset">
         重置配置
       </el-button>
@@ -587,7 +593,7 @@
       @timeupdate="handleTimeUpdate"
       @audiochange="handleAudioChange"
     />
-    <DownloadList />
+    <DownloadList @play-toggle="playAudioFromList" />
 
     <!-- AI 全局配置对话框 -->
     <el-dialog
@@ -817,25 +823,313 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 发音词典管理对话框 -->
+    <el-dialog
+      v-model="showDictDialog"
+      title="自定义发音词典"
+      width="680px"
+      destroy-on-close
+      class="pronunciation-dict-dialog"
+    >
+      <div class="dict-manager-container">
+        <!-- 新增规则表单 -->
+        <el-card class="add-rule-card" shadow="never">
+          <template #header>
+            <div class="card-header">
+              <span>添加/更新发音词条</span>
+            </div>
+          </template>
+          <el-form label-position="top" size="default">
+            <el-row :gutter="15">
+              <el-col :span="8">
+                <el-form-item label="待纠错词 (原文字)">
+                  <el-input v-model="newRuleWord" placeholder="如：重联、行行" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="转换类型">
+                  <el-radio-group v-model="newRuleType" size="default">
+                    <el-radio-button label="pinyin">拼音纠错</el-radio-button>
+                    <el-radio-button label="alias">别名替换</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item :label="newRuleType === 'pinyin' ? '正确拼音(带声调/空格)' : '替换文本(别名)'">
+                  <el-input 
+                    v-model="newRuleValue" 
+                    :placeholder="newRuleType === 'pinyin' ? 'chóng lián / chong2 lian2' : '语音合成'" 
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <div class="form-action-row" style="text-align: right; margin-top: 5px;">
+              <el-button type="primary" @click="addDictRule">加入词典</el-button>
+            </div>
+          </el-form>
+        </el-card>
+
+        <!-- 规则列表 -->
+        <el-card class="rule-list-card" shadow="never" style="margin-top: 15px;">
+          <template #header>
+            <div class="card-header">
+              <span>词典列表 ({{ audioConfig.dictionaryRules?.length || 0 }} 条)</span>
+            </div>
+          </template>
+          
+          <el-table :data="audioConfig.dictionaryRules || []" height="240px" style="width: 100%">
+            <el-table-column prop="word" label="原文字" width="150" show-overflow-tooltip />
+            <el-table-column prop="type" label="类型" width="120">
+              <template #default="scope">
+                <el-tag :type="scope.row.type === 'pinyin' ? 'success' : 'warning'">
+                  {{ scope.row.type === 'pinyin' ? '拼音纠错' : '别名替换' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="value" label="转换值" show-overflow-tooltip />
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="scope">
+                <el-button 
+                  type="danger" 
+                  size="small" 
+                  circle 
+                  :icon="Delete" 
+                  @click="deleteDictRule(scope.row.id)" 
+                />
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showDictDialog = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 历史与草稿侧边抽屉 -->
+    <el-drawer
+      v-model="showHistoryDrawer"
+      title="本地历史与草稿箱"
+      direction="rtl"
+      size="540px"
+      class="history-drafts-drawer"
+    >
+      <el-tabs v-model="activeHistoryTab" class="drawer-tabs">
+        <!-- 历史配音面板 -->
+        <el-tab-pane label="历史配音 (10条限额)" name="history">
+          <div class="history-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span class="tip-text" style="font-size: 0.85rem; color: #64748b;">本地保留最近 10 次成功的配音音频 (先进先出)</span>
+            <el-button 
+              v-if="historyRecords.length > 0"
+              type="danger" 
+              size="small" 
+              plain 
+              @click="clearAllHistory"
+            >
+              清空历史
+            </el-button>
+          </div>
+          
+          <div v-if="historyRecords.length === 0" class="empty-placeholder">
+            <el-empty description="暂无历史配音记录" :image-size="100" />
+          </div>
+          
+          <el-scrollbar v-else height="calc(100vh - 180px)">
+            <div class="history-list">
+              <div 
+                v-for="item in historyRecords" 
+                :key="item.id" 
+                class="history-card-item"
+              >
+                <div class="card-title-row">
+                  <span class="card-title" :title="item.text">{{ item.title }}...</span>
+                  <el-tag 
+                    size="small" 
+                    :type="item.voiceType === 'single' ? 'info' : 'success'"
+                  >
+                    {{ item.voiceType === 'single' ? '单人' : '多人' }}
+                  </el-tag>
+                </div>
+                
+                <div class="card-meta-row">
+                  <span class="meta-item"><el-icon><Service /></el-icon> {{ item.provider }}</span>
+                  <span class="meta-item"><el-icon><Document /></el-icon> {{ item.text.length }}字</span>
+                  <span class="meta-item"><el-icon><Setting /></el-icon> {{ formatFileSize(item.size) }}</span>
+                  <span class="meta-time">{{ new Date(item.createdAt).toLocaleString() }}</span>
+                </div>
+                
+                <div class="card-action-row">
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    plain
+                    :icon="VideoPlay"
+                    @click="playHistoryItem(item)"
+                  >
+                    播放
+                  </el-button>
+                  <el-button 
+                    type="success" 
+                    size="small" 
+                    plain
+                    :icon="Download"
+                    @click="downloadHistoryAudio(item)"
+                  >
+                    音频
+                  </el-button>
+                  <el-button 
+                    v-if="item.srtText"
+                    type="warning" 
+                    size="small" 
+                    plain
+                    :icon="Download"
+                    @click="downloadHistorySrt(item)"
+                  >
+                    字幕
+                  </el-button>
+                  <el-button 
+                    type="info" 
+                    size="small" 
+                    plain
+                    :icon="FolderOpened"
+                    @click="restoreConfig(item.config, item.text, item.voiceType)"
+                  >
+                    恢复配置
+                  </el-button>
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    link
+                    @click="deleteHistoryItem(item)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </el-scrollbar>
+        </el-tab-pane>
+
+        <!-- 本地草稿箱面板 -->
+        <el-tab-pane label="本地草稿箱" name="drafts">
+          <!-- 保存当前草稿 -->
+          <div class="create-draft-section" style="padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
+            <el-input 
+              v-model="newDraftTitle" 
+              placeholder="为当前草稿命名 (可选)..." 
+              size="default" 
+              style="margin-bottom: 8px;"
+            />
+            <el-button 
+              type="primary" 
+              size="default" 
+              style="width: 100%;"
+              @click="handleCreateDraft"
+            >
+              保存当前文本及配音参数为草稿
+            </el-button>
+          </div>
+          
+          <div class="history-header" style="margin: 15px 0 10px 0; display: flex; justify-content: space-between; align-items: center;">
+            <span class="tip-text" style="font-size: 0.85rem; color: #64748b;">手动保存的历史文案与角色映射表</span>
+            <el-button 
+              v-if="draftsStore.drafts.length > 0"
+              type="danger" 
+              size="small" 
+              plain 
+              @click="clearAllDrafts"
+            >
+              清空草稿
+            </el-button>
+          </div>
+
+          <div v-if="draftsStore.drafts.length === 0" class="empty-placeholder">
+            <el-empty description="草稿箱空空如也" :image-size="100" />
+          </div>
+
+          <el-scrollbar v-else height="calc(100vh - 280px)">
+            <div class="history-list">
+              <div 
+                v-for="item in draftsStore.drafts" 
+                :key="item.id" 
+                class="history-card-item"
+              >
+                <div class="card-title-row">
+                  <span class="card-title" style="font-weight: 600;">{{ item.title }}</span>
+                  <el-tag 
+                    size="small" 
+                    :type="item.dubbingMode === 'single' ? 'info' : 'success'"
+                  >
+                    {{ item.dubbingMode === 'single' ? '单人' : '多人' }}
+                  </el-tag>
+                </div>
+                
+                <div class="card-text-preview" style="font-size: 0.85rem; color: #64748b; margin: 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  {{ item.text }}
+                </div>
+                
+                <div class="card-meta-row">
+                  <span class="meta-item"><el-icon><Document /></el-icon> {{ item.text.length }}字</span>
+                  <span class="meta-time">{{ new Date(item.createdAt).toLocaleString() }}</span>
+                </div>
+                
+                <div class="card-action-row" style="margin-top: 10px;">
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    plain
+                    :icon="FolderOpened"
+                    @click="loadDraftItem(item)"
+                  >
+                    载入草稿
+                  </el-button>
+                  <el-button 
+                    type="danger" 
+                    size="small" 
+                    link
+                    @click="deleteDraftItem(item)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </el-scrollbar>
+        </el-tab-pane>
+      </el-tabs>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { AxiosError } from 'axios'
 import { Sparkles } from 'lucide-vue-next'
-import { ref, computed, onMounted, watch, onBeforeMount, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeMount, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useGenerationStore } from '@/stores/generation'
-import { UploadFilled, Service, Setting, ArrowUp, ArrowDown, Plus, Delete, Edit, Check, Close, Search, VideoPlay, VideoPause, Loading, Memo } from '@element-plus/icons-vue'
+import { useGenerationStore, type Audio } from '@/stores/generation'
+import { UploadFilled, Service, Setting, ArrowUp, ArrowDown, Plus, Delete, Edit, Check, Close, Search, VideoPlay, VideoPause, Loading, Memo, FolderOpened, Download, Document } from '@element-plus/icons-vue'
 import {
   asyncSleep,
   createAudioStreamProcessor,
   mapZHVoiceName,
   mockProgress,
   toFixed,
+  formatFileSize,
 } from '@/utils'
 import confetti from 'canvas-confetti'
-import { useAudioConfigStore, type AudioConfig } from '@/stores/audioConfig'
+import { useAudioConfigStore, type AudioConfig, type DictionaryRule } from '@/stores/audioConfig'
+import { useDraftsStore } from '@/stores/drafts'
+import {
+  getHistoryRecords,
+  saveHistoryRecord,
+  deleteHistoryRecord,
+  clearHistoryRecords,
+  updateHistorySrt,
+  type HistoryRecord
+} from '@/utils/historyDb'
 import { defaultVoiceList, previewTextSelect } from '@/constants/voice'
 import DownloadList from '@/components/DownloadList.vue'
 import Notification from '@/assets/notification.mp3'
@@ -849,12 +1143,19 @@ import {
   parseText,
   generateJsonStream,
   getSrtFile,
+  downloadFile,
 } from '@/api/tts'
 import { parseTextByRules } from '@/utils/parser'
 
 const generationStore = useGenerationStore()
 const configStore = useAudioConfigStore()
+const draftsStore = useDraftsStore()
 const { audioConfig } = configStore
+
+const showHistoryDrawer = ref(false)
+const activeHistoryTab = ref<'history' | 'drafts'>('history')
+const newDraftTitle = ref('')
+const historyRecords = ref<HistoryRecord[]>([])
 
 const dubbingMode = ref<'single' | 'multi'>('single')
 const parseMode = ref<'rule' | 'ai'>('rule')
@@ -991,6 +1292,481 @@ const handleAudioChange = (src: string) => {
   if (activeSrtFile.value) {
     fetchSubtitles(activeSrtFile.value)
   }
+}
+
+// ==========================================
+// 自定义发音字典与 SSML 拼音编译转换工具
+// ==========================================
+
+const showDictDialog = ref(false)
+const newRuleWord = ref('')
+const newRuleType = ref<'pinyin' | 'alias'>('pinyin')
+const newRuleValue = ref('')
+
+function convertPinyinToSapi(pinyinStr: string): string {
+  const toneMap: Record<string, { letter: string; tone: number }> = {
+    'ā': { letter: 'a', tone: 1 }, 'ō': { letter: 'o', tone: 1 }, 'ē': { letter: 'e', tone: 1 },
+    'ī': { letter: 'i', tone: 1 }, 'ū': { letter: 'u', tone: 1 }, 'ǖ': { letter: 'v', tone: 1 },
+    'á': { letter: 'a', tone: 2 }, 'ó': { letter: 'o', tone: 2 }, 'é': { letter: 'e', tone: 2 },
+    'í': { letter: 'i', tone: 2 }, 'ú': { letter: 'u', tone: 2 }, 'ǘ': { letter: 'v', tone: 2 },
+    'ǎ': { letter: 'a', tone: 3 }, 'ǒ': { letter: 'o', tone: 3 }, 'ě': { letter: 'e', tone: 3 },
+    'ǐ': { letter: 'i', tone: 3 }, 'ǔ': { letter: 'u', tone: 3 }, 'ǚ': { letter: 'v', tone: 3 },
+    'à': { letter: 'a', tone: 4 }, 'ò': { letter: 'o', tone: 4 }, 'è': { letter: 'e', tone: 4 },
+    'ì': { letter: 'i', tone: 4 }, 'ù': { letter: 'u', tone: 4 }, 'ǜ': { letter: 'v', tone: 4 },
+  }
+
+  // 1. 将所有带声调的字母替换为 "元音 + 声调数字"
+  let normalized = ''
+  for (let i = 0; i < pinyinStr.length; i++) {
+    const char = pinyinStr[i]
+    if (toneMap[char]) {
+      normalized += toneMap[char].letter + toneMap[char].tone
+    } else {
+      normalized += char
+    }
+  }
+
+  // 2. 将所有的 u: 或 ü 替换为 v，并转小写
+  normalized = normalized.toLowerCase().replace(/ü/g, 'v').replace(/u:/g, 'v')
+
+  // 3. 将声调数字移到音节末尾
+  // 规则：若 [1-5] 后面跟着 n/ng/r 且后面不是元音/声调，则移动
+  const regex = /([1-5])(ng|n|r)(?![aeiouüv1-5])/gi
+  let prev
+  do {
+    prev = normalized
+    normalized = normalized.replace(regex, '$2$1')
+  } while (normalized !== prev)
+
+  // 4. 在每个声调数字后面插入空格，以将连在一起的拼音分割开
+  normalized = normalized.replace(/([1-5])/g, '$1 ')
+
+  // 5. 分割并格式化为 SAPI 所需的 "pinyin tone" 格式
+  return normalized
+    .split(/\s+/)
+    .map(word => {
+      let cleanedWord = word.trim()
+      if (!cleanedWord) return ''
+
+      // 如果已是带声调数字的格式 (如 chong2 或 lv3)
+      const numMatch = /^([a-z]+)([1-5])$/.exec(cleanedWord)
+      if (numMatch) {
+        const pinyin = numMatch[1]
+        const tone = numMatch[2]
+        return `${pinyin} ${tone}`
+      }
+
+      // 如果没有声调数字，默认加上轻声 5
+      if (/^[a-z]+$/.test(cleanedWord)) {
+        return `${cleanedWord} 5`
+      }
+      return word
+    })
+    .filter(Boolean)
+    .join(' ')
+}
+
+function applyPronunciationDictionary(text: string, rules: DictionaryRule[]): string {
+  if (!rules || rules.length === 0 || !text) return text
+
+  // 长度降序排序，长词优先匹配
+  const sortedRules = [...rules].sort((a, b) => b.word.length - a.word.length)
+  let result = text
+
+  for (const rule of sortedRules) {
+    if (!rule.word.trim()) continue
+    const escapedWord = rule.word.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+    const regex = new RegExp(escapedWord, 'g')
+
+    if (rule.type === 'pinyin') {
+      const sapiPinyin = convertPinyinToSapi(rule.value)
+      const ssmlTag = `<phoneme alphabet="sapi" ph="${sapiPinyin}">${rule.word}</phoneme>`
+      result = result.replace(regex, ssmlTag)
+    } else if (rule.type === 'alias') {
+      const ssmlTag = `<sub alias="${rule.value}">${rule.word}</sub>`
+      result = result.replace(regex, ssmlTag)
+    }
+  }
+
+  return result
+}
+
+const addDictRule = () => {
+  const word = newRuleWord.value.trim()
+  const value = newRuleValue.value.trim()
+  if (!word || !value) {
+    ElMessage.warning('原词与拼音/别名值均不能为空！')
+    return
+  }
+  if (!audioConfig.dictionaryRules) {
+    audioConfig.dictionaryRules = []
+  }
+  
+  const existingIndex = audioConfig.dictionaryRules.findIndex(r => r.word === word)
+  if (existingIndex !== -1) {
+    audioConfig.dictionaryRules[existingIndex] = {
+      id: audioConfig.dictionaryRules[existingIndex].id,
+      word,
+      type: newRuleType.value,
+      value
+    }
+    ElMessage.success(`已更新已有词条 "${word}" 的发音配置`)
+  } else {
+    audioConfig.dictionaryRules.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      word,
+      type: newRuleType.value,
+      value
+    })
+    ElMessage.success(`已成功添加词条 "${word}" 到发音词典`)
+  }
+  
+  newRuleWord.value = ''
+  newRuleValue.value = ''
+}
+
+const deleteDictRule = (id: string) => {
+  if (!audioConfig.dictionaryRules) return
+  const index = audioConfig.dictionaryRules.findIndex(r => r.id === id)
+  if (index !== -1) {
+    const deletedWord = audioConfig.dictionaryRules[index].word
+    audioConfig.dictionaryRules.splice(index, 1)
+    ElMessage.info(`已删除词条 "${deletedWord}"`)
+  }
+}
+
+// ==========================================
+// 本地草稿箱与 IndexedDB 历史记录管理
+// ==========================================
+
+const loadHistoryList = async () => {
+  try {
+    historyRecords.value = await getHistoryRecords()
+  } catch (err) {
+    console.error('加载本地配音历史失败:', err)
+  }
+}
+
+const saveToIndexedDbHistory = async (data: any) => {
+  try {
+    let audioBlob: Blob
+    if (data.blobs && data.blobs.length > 0) {
+      audioBlob = new Blob(data.blobs, { type: 'audio/mpeg' })
+    } else {
+      const fetchUrl = downloadFile(data.file)
+      const res = await fetch(fetchUrl)
+      audioBlob = await res.blob()
+    }
+
+    const voiceConfig = dubbingMode.value === 'single' ? {
+      selectedVoice: audioConfig.selectedVoice,
+      rate: audioConfig.rate,
+      pitch: audioConfig.pitch,
+      volume: audioConfig.volume,
+    } : {
+      characterMap: JSON.parse(JSON.stringify(characterMap.value)),
+      parsedSegments: JSON.parse(JSON.stringify(parsedSegments.value)),
+    }
+
+    const historyRecord = {
+      id: data.id || data.file,
+      title: audioConfig.inputText.trim().slice(0, 20) || '未命名配音',
+      text: audioConfig.inputText,
+      voiceType: dubbingMode.value,
+      provider: audioConfig.ttsProvider,
+      config: {
+        ...voiceConfig,
+        ttsProvider: audioConfig.ttsProvider
+      },
+      audioBlob,
+      file: data.file,
+      size: audioBlob.size
+    }
+
+    await saveHistoryRecord(historyRecord)
+    console.log('已保存生成音频到本地 IndexedDB:', historyRecord.id)
+
+    // 异步拉取 srt 并存入
+    if (data.srt) {
+      const srtFile = data.srt.replace('.mp3', '.srt')
+      try {
+        const srtContent = await getSrtFile(srtFile)
+        if (srtContent) {
+          await updateHistorySrt(historyRecord.id, srtContent)
+          console.log('已异步关联 SRT 字幕到 IndexedDB:', historyRecord.id)
+        }
+      } catch (err) {
+        console.warn('获取 SRT 关联失败:', err)
+      }
+    }
+
+    await loadHistoryList()
+  } catch (err) {
+    console.error('保存至 IndexedDB 历史数据库失败:', err)
+  }
+}
+
+const playHistoryItem = async (record: HistoryRecord) => {
+  showStreamButton.value = true
+  await nextTick()
+  if (audioPlayerRef.value && audioPlayerRef.value.audioRef) {
+    // 释放之前的 Object URL (如果有的话)
+    if (audioPlayerRef.value.audioRef.src.startsWith('blob:')) {
+      URL.revokeObjectURL(audioPlayerRef.value.audioRef.src)
+    }
+    const localUrl = URL.createObjectURL(record.audioBlob)
+    audioPlayerRef.value.audioRef.src = localUrl
+    
+    if (record.srtText) {
+      subtitles.value = parseSRT(record.srtText)
+      currentSubtitleIndex.value = -1
+      activeSrtFile.value = ''
+    } else {
+      subtitles.value = []
+      currentSubtitleIndex.value = -1
+      activeSrtFile.value = ''
+    }
+    
+    // 设置时长
+    audioPlayerRef.value.audioRef.addEventListener('loadedmetadata', () => {
+      streamDuration.value = audioPlayerRef.value!.audioRef!.duration
+    }, { once: true })
+    
+    audioPlayerRef.value.audioRef.play().catch(err => {
+      console.error('播放历史音频失败:', err)
+    })
+    
+    ElMessage.success(`开始播放历史配音: "${record.title}..."`)
+  }
+}
+
+const currentPlayingItem = ref<Audio | null>(null)
+
+const onAudioPlay = () => {
+  if (currentPlayingItem.value) {
+    currentPlayingItem.value.isPlaying = true
+  }
+}
+const onAudioPause = () => {
+  if (currentPlayingItem.value) {
+    currentPlayingItem.value.isPlaying = false
+  }
+}
+const onAudioEnded = () => {
+  if (currentPlayingItem.value) {
+    currentPlayingItem.value.isPlaying = false
+  }
+}
+
+const playAudioFromList = async (item: Audio) => {
+  if (item.isPlaying) {
+    if (audioPlayerRef.value && audioPlayerRef.value.audioRef) {
+      audioPlayerRef.value.audioRef.pause()
+    }
+    item.isPlaying = false
+    return
+  }
+
+  // 1. 重置下载列表中所有项的播放状态为未播放
+  generationStore.audioList.forEach(a => {
+    a.isPlaying = false
+  })
+
+  showStreamButton.value = true
+  await nextTick()
+
+  if (audioPlayerRef.value && audioPlayerRef.value.audioRef) {
+    const audioEl = audioPlayerRef.value.audioRef
+
+    // 释放之前的 Object URL
+    if (audioEl.src.startsWith('blob:')) {
+      URL.revokeObjectURL(audioEl.src)
+    }
+
+    let audioUrl = item.audio
+    if (item.blobs && item.blobs.length > 0) {
+      const mimeType = 'audio/mpeg'
+      const audioBlob = new Blob(item.blobs, { type: mimeType })
+      audioUrl = URL.createObjectURL(audioBlob)
+    } else if (audioUrl && !audioUrl.startsWith('http') && !audioUrl.startsWith('blob')) {
+      audioUrl = downloadFile(audioUrl)
+    }
+
+    audioEl.src = audioUrl
+
+    // 2. 加载字幕
+    if (item.srt) {
+      const srtName = item.srt.includes('/') ? item.srt.split('/').pop()! : item.srt
+      activeSrtFile.value = srtName
+      await fetchSubtitles(srtName)
+    } else {
+      subtitles.value = []
+      currentSubtitleIndex.value = -1
+      activeSrtFile.value = ''
+    }
+
+    // 3. 监听元数据加载以更新时长
+    audioEl.addEventListener('loadedmetadata', () => {
+      streamDuration.value = audioEl.duration
+    }, { once: true })
+
+    currentPlayingItem.value = item
+
+    // 4. 绑定播放器标准播放事件
+    audioEl.removeEventListener('play', onAudioPlay)
+    audioEl.removeEventListener('pause', onAudioPause)
+    audioEl.removeEventListener('ended', onAudioEnded)
+
+    audioEl.addEventListener('play', onAudioPlay)
+    audioEl.addEventListener('pause', onAudioPause)
+    audioEl.addEventListener('ended', onAudioEnded)
+
+    // 5. 播放音频
+    try {
+      await audioEl.play()
+      item.isPlaying = true
+    } catch (err) {
+      console.error('播放下载列表音频失败:', err)
+    }
+  }
+}
+
+const downloadHistoryAudio = (record: HistoryRecord) => {
+  const url = URL.createObjectURL(record.audioBlob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = record.file.endsWith('.mp3') ? record.file : `${record.file}.mp3`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  ElMessage.success('音频文件开始下载！')
+}
+
+const downloadHistorySrt = (record: HistoryRecord) => {
+  if (!record.srtText) {
+    ElMessage.warning('该历史配音没有包含字幕数据！')
+    return
+  }
+  const blob = new Blob([record.srtText], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  const srtName = record.file.replace('.mp3', '.srt')
+  a.download = srtName.endsWith('.srt') ? srtName : `${srtName}.srt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  ElMessage.success('字幕文件开始下载！')
+}
+
+const deleteHistoryItem = async (record: HistoryRecord) => {
+  try {
+    await deleteHistoryRecord(record.id)
+    ElMessage.success('已成功删除该条历史记录！')
+    await loadHistoryList()
+  } catch (err) {
+    ElMessage.error('删除历史记录失败')
+  }
+}
+
+const clearAllHistory = () => {
+  ElMessageBox.confirm('确定要清空所有本地生成的历史音频吗？此操作不可逆。', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  }).then(async () => {
+    try {
+      await clearHistoryRecords()
+      ElMessage.success('已清空历史音频库！')
+      await loadHistoryList()
+    } catch (err) {
+      ElMessage.error('清空历史失败')
+    }
+  })
+}
+
+// 草稿箱操作
+const handleCreateDraft = () => {
+  const text = audioConfig.inputText.trim()
+  if (!text) {
+    ElMessage.warning('编辑器文本内容为空，无法保存草稿！')
+    return
+  }
+  
+  const voiceConfig = dubbingMode.value === 'single' ? {
+    selectedVoice: audioConfig.selectedVoice,
+    rate: audioConfig.rate,
+    pitch: audioConfig.pitch,
+    volume: audioConfig.volume,
+  } : {
+    characterMap: JSON.parse(JSON.stringify(characterMap.value)),
+    parsedSegments: JSON.parse(JSON.stringify(parsedSegments.value)),
+  }
+  
+  draftsStore.saveDraft(
+    newDraftTitle.value,
+    text,
+    dubbingMode.value,
+    {
+      ...voiceConfig,
+      ttsProvider: audioConfig.ttsProvider
+    }
+  )
+  
+  ElMessage.success(`草稿已成功保存为: "${newDraftTitle.value || '未命名草稿'}"`)
+  newDraftTitle.value = ''
+}
+
+const loadDraftItem = (draft: any) => {
+  restoreConfig(draft.config, draft.text, draft.dubbingMode)
+  ElMessage.success('成功从草稿中恢复文本及声音配置！')
+}
+
+const restoreConfig = (config: any, text: string, dubbingModeVal: 'single' | 'multi') => {
+  updateConfig('inputText', text)
+  dubbingMode.value = dubbingModeVal
+  
+  if (config.ttsProvider) {
+    updateConfig('ttsProvider', config.ttsProvider)
+  }
+  
+  if (dubbingModeVal === 'single') {
+    if (config.selectedVoice) updateConfig('selectedVoice', config.selectedVoice)
+    if (config.rate !== undefined) {
+      // 兼容可能为字符串或数字的 rate/pitch/volume
+      const rateVal = typeof config.rate === 'string' ? parseFloat(config.rate) : config.rate
+      updateConfig('rate', rateVal)
+    }
+    if (config.pitch !== undefined) {
+      const pitchVal = typeof config.pitch === 'string' ? parseFloat(config.pitch) : config.pitch
+      updateConfig('pitch', pitchVal)
+    }
+    if (config.volume !== undefined) {
+      const volVal = typeof config.volume === 'string' ? parseFloat(config.volume) : config.volume
+      updateConfig('volume', volVal)
+    }
+  } else {
+    if (config.characterMap) characterMap.value = JSON.parse(JSON.stringify(config.characterMap))
+    if (config.parsedSegments) parsedSegments.value = JSON.parse(JSON.stringify(config.parsedSegments))
+  }
+}
+
+const deleteDraftItem = (draft: any) => {
+  draftsStore.deleteDraft(draft.id)
+  ElMessage.info('已删除草稿')
+}
+
+const clearAllDrafts = () => {
+  ElMessageBox.confirm('确定要清空草稿箱吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  }).then(() => {
+    draftsStore.clearDrafts()
+    ElMessage.success('已清空草稿箱！')
+  })
 }
 
 // Segment editing and management states
@@ -1333,7 +2109,8 @@ const previewAudio = async () => {
   if (!previewText.trim() || !canPreview.value) return
   previewLoading.value = true
   try {
-    const params = buildParams(previewText)
+    const preparedText = applyPronunciationDictionary(previewText, audioConfig.dictionaryRules || [])
+    const params = buildParams(preparedText)
     const { data } = await generateTTS(params)
     if (data?.audio) {
       updateConfig('previewAudioUrl', data?.audio)
@@ -1378,6 +2155,9 @@ const updateAudioList = (data: GenerateResponse) => {
   playSuccessSound()
   generating.value = false
 
+  // 异步将音频及配置保存入本地 IndexedDB 历史
+  saveToIndexedDbHistory(data)
+
   const rect = confettiElement.value?.getBoundingClientRect()
   if (rect) {
     const originX = (rect.left + rect.width / 2) / window.innerWidth
@@ -1398,7 +2178,8 @@ const generateAudio = async () => {
   generationStore.updateProgress(0)
 
   try {
-    const params = buildParams(inputText)
+    const preparedText = applyPronunciationDictionary(inputText, audioConfig.dictionaryRules || [])
+    const params = buildParams(preparedText)
     const { data } = await generateTTS(params)
     if (!data) {
       throw new Error(`no data returned from generateTTS`)
@@ -1418,7 +2199,8 @@ const generateAudioTask = async () => {
   generationStore.updateProgress(0)
 
   try {
-    const params = buildParams(inputText)
+    const preparedText = applyPronunciationDictionary(inputText, audioConfig.dictionaryRules || [])
+    const params = buildParams(preparedText)
     const res = await createTaskStream(params)
     let stream: ReadableStream
     let ttsId = ''
@@ -1461,6 +2243,7 @@ const generateAudioTask = async () => {
         id: name,
         name,
         blobs,
+        srt: ttsId ? ttsId.replace('.mp3', '.srt') : undefined,
       }
       generationStore.updateProgress(100)
       updateAudioList(result)
@@ -1976,8 +2759,9 @@ const previewSegmentAudio = async (segment: any) => {
   }
   segmentPreviewLoading.value[segment.id] = true
   try {
+    const preparedText = applyPronunciationDictionary(segment.text, audioConfig.dictionaryRules || [])
     const params = {
-      text: segment.text,
+      text: preparedText,
       voice: charConfig.voice,
       rate: `${charConfig.rate >= 0 ? '+' : ''}${charConfig.rate}%`,
       pitch: `${charConfig.pitch >= 0 ? '+' : ''}${charConfig.pitch}Hz`,
@@ -2014,8 +2798,9 @@ const generateMultiAudioTask = async () => {
         pitch: 0,
         volume: 0
       }
+      const preparedText = applyPronunciationDictionary(seg.text, audioConfig.dictionaryRules || [])
       return {
-        text: seg.text,
+        text: preparedText,
         voice: charConfig.voice,
         rate: `${charConfig.rate >= 0 ? '+' : ''}${charConfig.rate}%`,
         pitch: `${charConfig.pitch >= 0 ? '+' : ''}${charConfig.pitch}Hz`,
@@ -2071,6 +2856,7 @@ const generateMultiAudioTask = async () => {
         id: name,
         name,
         blobs,
+        srt: ttsId ? ttsId.replace('.mp3', '.srt') : undefined,
       }
       generationStore.updateProgress(100)
       updateAudioList(result)
@@ -2142,6 +2928,8 @@ onBeforeUnmount(() => {
 })
 onMounted(async () => {
   successAudio.value = new Audio(Notification)
+  // 加载 IndexedDB 中的本地配音历史
+  loadHistoryList()
   try {
     const response = await getVoiceList()
     voiceList.value = response?.data!
@@ -2867,6 +3655,114 @@ onMounted(async () => {
   font-size: 1.15rem;
   transform: scale(1.04);
   text-shadow: 0 2px 10px rgba(26, 86, 219, 0.15);
+}
+
+/* 自定义发音词典管理样式 */
+.dict-manager-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.pronunciation-dict-dialog :deep(.el-dialog__body) {
+  padding-top: 10px;
+  padding-bottom: 20px;
+}
+.add-rule-card, .rule-list-card {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.add-rule-card :deep(.el-card__header), .rule-list-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 600;
+  color: #334155;
+}
+.add-rule-card :deep(.el-card__body), .rule-list-card :deep(.el-card__body) {
+  padding: 16px;
+}
+.form-action-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* 历史与草稿抽屉样式 */
+.history-drafts-drawer :deep(.el-drawer__body) {
+  padding-top: 0px;
+}
+.drawer-tabs :deep(.el-tabs__item) {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 20px;
+}
+.history-card-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+.history-card-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+.card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+.card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.meta-time {
+  margin-left: auto;
+  color: #94a3b8;
+}
+.card-action-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px dashed #e2e8f0;
+  padding-top: 8px;
+  justify-content: flex-end;
+}
+.empty-placeholder {
+  padding: 40px 0;
+  text-align: center;
+}
+.create-draft-section {
+  transition: all 0.2s ease;
+}
+.create-draft-section:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 </style>
 
