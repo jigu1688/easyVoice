@@ -31,7 +31,8 @@ export class OpenAITtsEngine implements TTSEngine {
         'Input text exceeds 4096 characters, which is the maximum allowed by OpenAI TTS.'
       )
     }
-    if (!OPENAI_VOICES.includes(voice as OpenAIVoice)) {
+    const isOfficialOpenAI = this.baseUrl.includes('api.openai.com')
+    if (isOfficialOpenAI && !OPENAI_VOICES.includes(voice as OpenAIVoice)) {
       throw new Error(`Invalid voice: ${voice}. Supported voices are: ${OPENAI_VOICES.join(', ')}.`);
     }
     if (speed < 0.25 || speed > 4.0) {

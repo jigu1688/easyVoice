@@ -35,8 +35,24 @@ export async function runOpenAITTS(params: any): Promise<Buffer | Readable> {
     }
   }
 
+  let targetVoice = voice
+  const isOfficialOpenAI = !openaiTtsBaseUrl || openaiTtsBaseUrl.includes('api.openai.com')
+  if (!isOfficialOpenAI) {
+    const voiceMapping: Record<string, string> = {
+      alloy: 'M1',
+      echo: 'M2',
+      fable: 'M3',
+      onyx: 'M4',
+      nova: 'F1',
+      shimmer: 'F2',
+    }
+    if (voiceMapping[voice]) {
+      targetVoice = voiceMapping[voice]
+    }
+  }
+
   const audioBuffer = await engine.synthesize(text, {
-    voice,
+    voice: targetVoice,
     speed,
     format: 'mp3',
   })
