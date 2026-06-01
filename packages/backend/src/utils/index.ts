@@ -254,3 +254,11 @@ export function escapeSSML(text: string) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
 }
+
+export function cleanJsonString(str: string): string {
+  let cleaned = str.trim()
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim()
+  }
+  return cleaned
+}

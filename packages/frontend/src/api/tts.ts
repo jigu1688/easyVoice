@@ -115,4 +115,54 @@ export const createTaskStream = async (data: TaskRequest) => {
   return response.data as ReadableStream
 }
 
+export interface ParseTextRequest {
+  text: string
+  openaiBaseUrl?: string
+  openaiKey?: string
+  openaiModel?: string
+}
+
+export interface ParseTextResponse {
+  segments: {
+    name?: string
+    charactor: string
+    text: string
+    rate?: string
+    volume?: string
+    pitch?: string
+  }[]
+}
+
+export const parseText = async (data: ParseTextRequest) => {
+  const response = await api.post<ResponseWrapper<ParseTextResponse>>('/parse', data)
+  if (response.data?.code !== 200 || !response.data?.success) {
+    throw new Error(response.data?.message || '文本角色解析失败')
+  }
+  return response.data
+}
+
+export const generateJsonStream = async (data: { data: any[] }) => {
+  const response = await api.post<ReadableStream | ResponseWrapper<GenerateResponse>>(
+    `/generateJson`,
+    data,
+    {
+      responseType: 'stream',
+      adapter: 'fetch',
+      timeout: 0,
+    }
+  )
+  const ttsType = response.headers['x-generate-tts-type']
+  const contentType = response.headers['content-type']
+  if (
+    response.status !== 200 ||
+    ttsType === 'application/json' ||
+    contentType?.includes?.('application/json')
+  ) {
+    const text = await new Response(response.data as any).text()
+    const responseData = JSON.parse(text)
+    return responseData
+  }
+  return response.data as ReadableStream
+}
+
 export const downloadFile = (file: string) => `${api.defaults.baseURL}/download/${file}`

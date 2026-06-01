@@ -6,6 +6,9 @@ import fs from 'fs/promises'
 import { ALLOWED_EXTENSIONS, AUDIO_DIR } from '../config'
 import { EdgeSchema } from '../schema/generate'
 import taskManager from '../utils/taskManager'
+import { getPrompt, getParseOnlyPrompt } from '../llm/prompt/generateSegment'
+import { openai } from '../utils/openai'
+import { getLangConfig, cleanJsonString } from '../utils'
 function formatBody({ text, pitch, voice, volume, rate, useLLM }: EdgeSchema) {
   const positivePercent = (value: string | undefined) => {
     if (value === '0%' || value === '0' || value === undefined) return '+0%'
@@ -175,5 +178,46 @@ export async function getVoiceList(req: Request, res: Response, next: NextFuncti
       message: errorMessage,
       success: false,
     })
+  }
+}
+
+export async function parseText(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { text, openaiBaseUrl, openaiKey, openaiModel } = req.body
+    logger.info(`Parsing text characters with LLM... text length: ${text?.length}`)
+    
+    const { lang } = await getLangConfig(text)
+    
+    openai.config({
+      apiKey: openaiKey,
+      baseURL: openaiBaseUrl,
+      model: openaiModel,
+    })
+    
+    const prompt = getParseOnlyPrompt(lang, text)
+    const completion = await openai.createChatCompletion({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant. And you can return valid json object',
+        },
+        { role: 'user', content: prompt },
+      ],
+      response_format: { type: 'json_object' },
+    })
+
+    const content = cleanJsonString(completion.choices[0]?.message?.content || '')
+    if (!content) {
+      throw new Error('LLM did not return any content')
+    }
+    const result = JSON.parse(content)
+    res.json({
+      code: 200,
+      success: true,
+      data: result,
+    })
+  } catch (error) {
+    logger.error(`parseText Error: ${error instanceof Error ? error.message : String(error)}`)
+    next(error)
   }
 }

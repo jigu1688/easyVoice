@@ -20,7 +20,7 @@ export function createOpenAIClient() {
   let currentConfig: OpenAIConfig = {
     baseURL: OPENAI_BASE_URL,
     model: MODEL_NAME,
-    timeout: 60000,
+    timeout: 120000,
     apiKey: OPENAI_API_KEY,
   }
   logger.debug(`init openai with: `, {
@@ -48,16 +48,25 @@ export function createOpenAIClient() {
         ...customConfig,
       }
 
+      const payload: any = {
+        ...request,
+        model: request.model || mergedConfig.model,
+        temperature: request.temperature ?? 1.0,
+        max_tokens: request.max_tokens,
+        top_p: request.top_p ?? 1.0,
+        stream: request.stream ?? false,
+      }
+
+      // 智谱 AI (bigmodel.cn) 或某些不支持 json_object 格式的服务商，移除 response_format 参数
+      const isZhipu = mergedConfig.baseURL?.includes('bigmodel.cn')
+      const isMimo = mergedConfig.baseURL?.includes('mimo')
+      if ((isZhipu || isMimo) && payload.response_format) {
+        delete payload.response_format
+      }
+
       const response = await fetcher.post<ChatCompletionResponse>(
         `${mergedConfig.baseURL}${mergedConfig.baseURL?.endsWith('/') ? '' : '/'}chat/completions`,
-        {
-          model: request.model || mergedConfig.model,
-          temperature: request.temperature ?? 1.0,
-          max_tokens: request.max_tokens,
-          top_p: request.top_p ?? 1.0,
-          stream: request.stream ?? false,
-          ...request,
-        },
+        payload,
         {
           headers: getHeaders(),
           timeout: mergedConfig.timeout,

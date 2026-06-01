@@ -4,7 +4,7 @@ import ffmpeg from 'fluent-ffmpeg'
 import { AUDIO_DIR, STATIC_DOMAIN, EDGE_API_LIMIT } from '../config'
 import { logger } from '../utils/logger'
 import { getPrompt } from '../llm/prompt/generateSegment'
-import { ensureDir, generateId, getLangConfig, readJson } from '../utils'
+import { ensureDir, generateId, getLangConfig, readJson, cleanJsonString } from '../utils'
 import { openai } from '../utils/openai'
 import { splitText } from './text.service'
 import { generateSingleVoice, generateSrt } from './edge-tts.service'
@@ -324,7 +324,8 @@ async function fetchLLMSegment(prompt: string): Promise<any> {
  * 解析 LLM 响应
  */
 function parseLLMResponse(response: any): TTSParams {
-  const params = JSON.parse(response.choices[0].message.content) as TTSParams
+  const content = cleanJsonString(response.choices[0].message.content || '')
+  const params = JSON.parse(content) as TTSParams
   if (!params || typeof params !== 'object') {
     throw new Error(ErrorMessages.INVALID_PARAMS_FORMAT)
   }
