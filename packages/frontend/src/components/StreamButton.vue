@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { debounce } from '@/utils'
 import { ElButton, ElSlider } from 'element-plus'
 import type { Arrayable } from 'element-plus/es/utils/index.mjs'
@@ -46,7 +46,7 @@ interface Prop {
   duration: number
 }
 const props = defineProps<Prop>()
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'timeupdate', 'audiochange'])
 const audioRef = ref<HTMLAudioElement | null>(null)
 const progress = ref(0)
 const currentTime = ref(0)
@@ -65,6 +65,7 @@ const realClose = () => {
   if (audioRef.value) {
     audioRef.value.src = ''
   }
+  emit('timeupdate', 0)
 }
 const toggle = () => {
   if (isPlaying.value) {
@@ -95,6 +96,7 @@ const updateProgress = () => {
   if (audioRef.value) {
     currentTime.value = audioRef.value.currentTime
     progress.value = (currentTime.value / props.duration) * 100
+    emit('timeupdate', currentTime.value)
   }
 }
 
@@ -120,6 +122,23 @@ const formatTime = (time: number) => {
   const seconds = Math.floor(time % 60)
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`
 }
+
+const handleLoadStart = () => {
+  emit('audiochange', audioRef.value?.src || '')
+}
+
+onMounted(() => {
+  if (audioRef.value) {
+    audioRef.value.addEventListener('loadstart', handleLoadStart)
+  }
+})
+
+onUnmounted(() => {
+  if (audioRef.value) {
+    audioRef.value.removeEventListener('loadstart', handleLoadStart)
+  }
+})
+
 defineExpose({
   audioRef,
 })

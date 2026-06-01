@@ -555,11 +555,37 @@
         :color="customColors"
       />
     </div>
+    <!-- 字幕同步滚动预览面板 -->
+    <transition name="el-zoom-in-bottom">
+      <div v-if="showStreamButton && subtitles.length > 0" class="subtitles-container-card">
+        <div class="subtitles-header">
+          <span class="title-text">
+            <el-icon class="mr-1"><Memo /></el-icon>AI 配音字幕同步预览
+          </span>
+          <span class="subtitle-badge">SRT 同步中</span>
+        </div>
+        <div class="subtitles-viewport" ref="subtitlesViewportRef">
+          <div class="subtitles-list">
+            <div
+              v-for="(line, idx) in subtitles"
+              :key="line.index"
+              class="subtitle-line"
+              :class="{ active: idx === currentSubtitleIndex }"
+            >
+              {{ line.text }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <StreamButton
       ref="audioPlayerRef"
       v-if="showStreamButton"
       :duration="streamDuration"
       @close="handleClose"
+      @timeupdate="handleTimeUpdate"
+      @audiochange="handleAudioChange"
     />
     <DownloadList />
 
@@ -800,7 +826,7 @@ import { Sparkles } from 'lucide-vue-next'
 import { ref, computed, onMounted, watch, onBeforeMount, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useGenerationStore } from '@/stores/generation'
-import { UploadFilled, Service, Setting, ArrowUp, ArrowDown, Plus, Delete, Edit, Check, Close, Search, VideoPlay, VideoPause, Loading } from '@element-plus/icons-vue'
+import { UploadFilled, Service, Setting, ArrowUp, ArrowDown, Plus, Delete, Edit, Check, Close, Search, VideoPlay, VideoPause, Loading, Memo } from '@element-plus/icons-vue'
 import {
   asyncSleep,
   createAudioStreamProcessor,
@@ -822,6 +848,7 @@ import {
   createTaskStream,
   parseText,
   generateJsonStream,
+  getSrtFile,
 } from '@/api/tts'
 import { parseTextByRules } from '@/utils/parser'
 
@@ -835,6 +862,136 @@ const parsing = ref(false)
 const parsedSegments = ref<{ id: string, charactor: string, text: string }[]>([])
 const characterMap = ref<Record<string, { voice: string, rate: number, volume: number, pitch: number }>>({})
 const segmentPreviewLoading = ref<Record<string, boolean>>({})
+
+// 字幕同步滚动相关状态与解析器
+interface SubtitleLine {
+  index: number
+  start: number // 秒
+  end: number   // 秒
+  text: string
+}
+
+const subtitles = ref<SubtitleLine[]>([])
+const currentSubtitleIndex = ref(-1)
+const activeSrtFile = ref('')
+const currentTime = ref(0)
+const subtitlesViewportRef = ref<HTMLDivElement | null>(null)
+
+function parseSRT(srtText: string): SubtitleLine[] {
+  const lines = srtText.split(/\r?\n/)
+  const result: SubtitleLine[] = []
+  let i = 0
+  
+  while (i < lines.length) {
+    const line = lines[i].trim()
+    if (!line) {
+      i++
+      continue
+    }
+    
+    // 解析索引
+    const index = parseInt(line, 10)
+    if (isNaN(index)) {
+      i++
+      continue
+    }
+    
+    i++
+    if (i >= lines.length) break
+    const timeLine = lines[i].trim()
+    const match = /^(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})$/.exec(timeLine)
+    if (!match) {
+      i++
+      continue
+    }
+    
+    // 解析秒数
+    const startSec = parseInt(match[1], 10) * 3600 + parseInt(match[2], 10) * 60 + parseInt(match[3], 10) + parseInt(match[4], 10) / 1000
+    const endSec = parseInt(match[5], 10) * 3600 + parseInt(match[6], 10) * 60 + parseInt(match[7], 10) + parseInt(match[8], 10) / 1000
+    
+    i++
+    let text = ''
+    while (i < lines.length && lines[i].trim() !== '') {
+      text += (text ? '\n' : '') + lines[i].trim()
+      i++
+    }
+    
+    result.push({
+      index,
+      start: startSec,
+      end: endSec,
+      text,
+    })
+    i++
+  }
+  
+  return result
+}
+
+const fetchSubtitles = async (srtFilename: string, retries = 5, delay = 500) => {
+  if (!srtFilename) {
+    subtitles.value = []
+    currentSubtitleIndex.value = -1
+    return
+  }
+  const srtFile = srtFilename.replace('.mp3', '.srt')
+  for (let i = 0; i < retries; i++) {
+    try {
+      const srtContent = await getSrtFile(srtFile)
+      if (srtContent) {
+        subtitles.value = parseSRT(srtContent)
+        currentSubtitleIndex.value = -1
+        console.log('成功读取并解析字幕行数:', subtitles.value.length)
+        return
+      }
+    } catch (err) {
+      if (i < retries - 1) {
+        console.warn(`第 ${i + 1} 次拉取字幕失败，将在 ${delay}ms 后重试...`)
+        await asyncSleep(delay)
+      } else {
+        console.error('拉取字幕失败或当前服务不支持时间戳:', err)
+        subtitles.value = []
+        currentSubtitleIndex.value = -1
+      }
+    }
+  }
+}
+
+const scrollToActiveSubtitle = (index: number) => {
+  const viewport = subtitlesViewportRef.value
+  if (!viewport) return
+  const activeLine = viewport.querySelector(`.subtitle-line:nth-child(${index + 1})`) as HTMLElement
+  if (activeLine) {
+    const top = activeLine.offsetTop - viewport.clientHeight / 2 + activeLine.clientHeight / 2
+    viewport.scrollTo({
+      top,
+      behavior: 'smooth'
+    })
+  }
+}
+
+const handleTimeUpdate = (time: number) => {
+  currentTime.value = time
+  if (!subtitles.value.length) return
+  
+  const index = subtitles.value.findIndex(line => time >= line.start && time <= line.end)
+  if (index !== -1 && index !== currentSubtitleIndex.value) {
+    currentSubtitleIndex.value = index
+    scrollToActiveSubtitle(index)
+  }
+}
+
+const handleAudioChange = (src: string) => {
+  if (!src) {
+    subtitles.value = []
+    currentSubtitleIndex.value = -1
+    activeSrtFile.value = ''
+    return
+  }
+  if (activeSrtFile.value) {
+    fetchSubtitles(activeSrtFile.value)
+  }
+}
 
 // Segment editing and management states
 const editingSegmentId = ref<string | null>(null)
@@ -958,10 +1115,16 @@ const handleClose = (realClose: () => void) => {
       generationStore.updateProgress(0)
       processor.value!.stop()
       showStreamButton.value = false
+      subtitles.value = []
+      currentSubtitleIndex.value = -1
+      activeSrtFile.value = ''
     })
   } else {
     realClose()
     showStreamButton.value = false
+    subtitles.value = []
+    currentSubtitleIndex.value = -1
+    activeSrtFile.value = ''
   }
 }
 const reset = () => {
@@ -1256,12 +1419,18 @@ const generateAudioTask = async () => {
 
   try {
     const params = buildParams(inputText)
-    const stream = await createTaskStream(params)
-    if (!(stream instanceof ReadableStream)) {
-      if (stream.code && stream.data) {
-        updateAudioList(stream.data)
+    const res = await createTaskStream(params)
+    let stream: ReadableStream
+    let ttsId = ''
+    if (res && res.stream) {
+      stream = res.stream
+      ttsId = res.id
+    } else {
+      if (res && res.code && res.data) {
+        updateAudioList(res.data)
         return
       }
+      throw new Error('未获取到有效的音频流')
     }
     console.log('typeof stream:', typeof stream)
     console.log('stream instanceof ReadableStream :', stream instanceof ReadableStream)
@@ -1295,6 +1464,13 @@ const generateAudioTask = async () => {
       }
       generationStore.updateProgress(100)
       updateAudioList(result)
+
+      if (ttsId) {
+        const srtName = ttsId.replace('.mp3', '.srt')
+        activeSrtFile.value = srtName
+        fetchSubtitles(srtName)
+      }
+
       audioPlayerRef.value!.audioRef?.addEventListener(
         'loadedmetadata',
         () => {
@@ -1307,7 +1483,7 @@ const generateAudioTask = async () => {
       console.error(msg)
     }
     processor.value = createAudioStreamProcessor(
-      stream as unknown as ReadableStream,
+      stream,
       onStart,
       onProgress,
       onFinished,
@@ -1847,7 +2023,7 @@ const generateMultiAudioTask = async () => {
       }
     })
 
-    const stream = await generateJsonStream({
+    const res = await generateJsonStream({
       data: payloadData,
       ttsProvider: audioConfig.ttsProvider,
       azureKey: audioConfig.azureKey,
@@ -1855,11 +2031,17 @@ const generateMultiAudioTask = async () => {
       openaiTtsKey: audioConfig.openaiTtsKey,
       openaiTtsBaseUrl: audioConfig.openaiTtsBaseUrl,
     })
-    if (!(stream instanceof ReadableStream)) {
-      if (stream.code && stream.data) {
-        updateAudioList(stream.data)
+    let stream: ReadableStream
+    let ttsId = ''
+    if (res && res.stream) {
+      stream = res.stream
+      ttsId = res.id
+    } else {
+      if (res && res.code && res.data) {
+        updateAudioList(res.data)
         return
       }
+      throw new Error('未获取到有效的音频流')
     }
 
     showStreamButton.value = true
@@ -1892,6 +2074,13 @@ const generateMultiAudioTask = async () => {
       }
       generationStore.updateProgress(100)
       updateAudioList(result)
+
+      if (ttsId) {
+        const srtName = ttsId.replace('.mp3', '.srt')
+        activeSrtFile.value = srtName
+        fetchSubtitles(srtName)
+      }
+
       audioPlayerRef.value!.audioRef?.addEventListener(
         'loadedmetadata',
         () => {
@@ -1905,7 +2094,7 @@ const generateMultiAudioTask = async () => {
       ElMessage.error(`生成失败: ${msg}`)
     }
     processor.value = createAudioStreamProcessor(
-      stream as unknown as ReadableStream,
+      stream,
       onStart,
       onProgress,
       onFinished,
@@ -2599,6 +2788,85 @@ onMounted(async () => {
   .voice-market-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* AI 字幕同步预览卡片 */
+.subtitles-container-card {
+  margin: 20px auto;
+  max-width: 600px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.subtitles-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  padding-bottom: 8px;
+}
+
+.subtitles-header .title-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+}
+
+.subtitles-header .mr-1 {
+  margin-right: 4px;
+  color: #3b82f6;
+}
+
+.subtitles-header .subtitle-badge {
+  font-size: 0.7rem;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.subtitles-viewport {
+  height: 160px;
+  overflow-y: hidden; /* 隐藏默认滚动条，靠 js 丝滑定位 */
+  position: relative;
+  /* 渐变遮罩实现顶部和底部淡出歌词效果 */
+  mask-image: linear-gradient(to bottom, transparent 0%, white 25%, white 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, white 25%, white 75%, transparent 100%);
+}
+
+.subtitles-list {
+  padding: 70px 0; /* 前后留白以支持第一句和最后一句也能完美居中 */
+}
+
+.subtitle-line {
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(71, 85, 105, 0.6);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(0.95);
+  transform-origin: center center;
+  line-height: 1.6;
+}
+
+.subtitle-line.active {
+  color: #1a56db;
+  font-weight: 700;
+  font-size: 1.15rem;
+  transform: scale(1.04);
+  text-shadow: 0 2px 10px rgba(26, 86, 219, 0.15);
 }
 </style>
 

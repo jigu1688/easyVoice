@@ -118,7 +118,10 @@ export const createTaskStream = async (data: TaskRequest) => {
     const responseData = JSON.parse(text)
     return responseData
   }
-  return response.data as ReadableStream
+  return {
+    stream: response.data as ReadableStream,
+    id: decodeURIComponent(response.headers['x-generate-tts-id'] || response.headers['X-Generate-Tts-Id'] || '')
+  }
 }
 
 export interface ParseTextRequest {
@@ -177,7 +180,16 @@ export const generateJsonStream = async (data: GenerateJsonRequest) => {
     const responseData = JSON.parse(text)
     return responseData
   }
-  return response.data as ReadableStream
+  return {
+    stream: response.data as ReadableStream,
+    id: decodeURIComponent(response.headers['x-generate-tts-id'] || response.headers['X-Generate-Tts-Id'] || '')
+  }
 }
 
 export const downloadFile = (file: string) => `${api.defaults.baseURL}/download/${file}`
+
+export const getSrtFile = async (file: string): Promise<string> => {
+  const response = await api.get<string>(`/download/${file}`, { responseType: 'text' })
+  return response.data
+}
+

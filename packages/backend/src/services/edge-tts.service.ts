@@ -100,15 +100,80 @@ function formatTime(ms: number): string {
  * @returns SRT 格式的字符串
  */
 function convertToSrt(subtitles: Subtitle[]): string {
-  let srtContent = ''
+  if (!subtitles || subtitles.length === 0) return ''
 
-  subtitles.forEach((subtitle, index) => {
+  const groupedSubtitles: Subtitle[] = []
+  let current: Subtitle | null = null
+
+  // 标点符号与断句正则（支持匹配末尾带引号/括号等闭合标点）
+  const sentenceEndRegex = /[。！？!?\n][”’」』）'"）｝】\]\}]*$/
+  const phraseEndRegex = /[，；、：,;:，][”’」』）'"）｝】\]\}]*$/
+  const isOnlyPunctuationRegex = /^[”’」』）'"）｝】\]\}，。！？、：；,.;!?\s]*$/
+
+  for (const sub of subtitles) {
+    const part = sub.part
+    if (!part) continue
+
+    if (!current) {
+      current = {
+        part: part,
+        start: sub.start,
+        end: sub.end
+      }
+    } else {
+      const currentText = current.part.trim()
+      const isOnlyPunct = isOnlyPunctuationRegex.test(part.trim())
+
+      if (isOnlyPunct) {
+        // 如果当前片段仅仅是标点符号（如引号），强行合并到上一句，不进行断句
+        current.part += part
+        current.end = sub.end
+      } else {
+        const endsWithSentenceEnd = sentenceEndRegex.test(currentText)
+        const endsWithPhraseEnd = phraseEndRegex.test(currentText)
+        
+        const totalLen = current.part.length + part.length
+        const isOverLimit = totalLen > 18
+        const isBigPause = sub.start - current.end > 1200 // 停顿超过 1.2 秒
+
+        if (endsWithSentenceEnd || isOverLimit || isBigPause) {
+          // 强断句
+          groupedSubtitles.push(current)
+          current = {
+            part: part,
+            start: sub.start,
+            end: sub.end
+          }
+        } else if (endsWithPhraseEnd && totalLen >= 10) {
+          // 弱断句，累积字数足够时在逗号处换行
+          groupedSubtitles.push(current)
+          current = {
+            part: part,
+            start: sub.start,
+            end: sub.end
+          }
+        } else {
+          // 合并
+          current.part += part
+          current.end = sub.end
+        }
+      }
+    }
+  }
+
+  if (current) {
+    groupedSubtitles.push(current)
+  }
+
+  let srtContent = ''
+  groupedSubtitles.forEach((subtitle, index) => {
     const startTime = formatTime(subtitle.start)
     const endTime = formatTime(subtitle.end)
+    const cleanText = subtitle.part.replace(/[\r\n]+/g, ' ').trim()
 
     srtContent += `${index + 1}\n`
     srtContent += `${startTime} --> ${endTime}\n`
-    srtContent += `${subtitle.part}\n\n`
+    srtContent += `${cleanText}\n\n`
   })
 
   return srtContent

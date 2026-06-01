@@ -217,7 +217,8 @@ async function buildSegment(params: TTSParams, task: Task, dir: string = '') {
     headers: {
       'content-type': 'application/octet-stream',
       'x-generate-tts-type': 'stream',
-      'Access-Control-Expose-Headers-generate-tts-id': task.id,
+      'x-generate-tts-id': encodeURIComponent(segment.id),
+      'Access-Control-Expose-Headers': 'x-generate-tts-type, x-generate-tts-id',
     },
     fileName: segment.id,
     onError: (err) => `Custom error: ${err.message}`,
@@ -274,7 +275,8 @@ async function buildSegmentList(segments: BuildSegment[], task: Task): Promise<v
     headers: {
       'content-type': 'application/octet-stream',
       'x-generate-tts-type': 'stream',
-      'Access-Control-Expose-Headers-generate-tts-id': task.id,
+      'x-generate-tts-id': encodeURIComponent(segment.id),
+      'Access-Control-Expose-Headers': 'x-generate-tts-type, x-generate-tts-id',
     },
     onError: (err) => `Custom error: ${err.message}`,
     fileName: segment.id,

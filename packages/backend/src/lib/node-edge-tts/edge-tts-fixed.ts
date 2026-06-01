@@ -165,6 +165,10 @@ class EdgeTTS {
     subFile.forEach((cue: SubLine, index: number) => {
       let fullPart = ''
       let stepIndex = 0
+      
+      // 允许吞噬的标点符号及空白正则（包含中英文引号、书名号、括号、空白、换行等）
+      const swallowableRegex = /^[”’」』）'"）｝】\]\}，。！？、：；,.;!?\s\r\n\t—（«»“”]/
+      
       for (let sci = subCharIndex; sci < subChars.length; sci++) {
         if (subChars[sci] === cue.part[stepIndex]) {
           fullPart = fullPart + subChars[sci]
@@ -173,6 +177,11 @@ class EdgeTTS {
           subCharIndex = sci
           break
         } else {
+          // 如果当前 cue 已经全部匹配完毕，并且我们要吞噬的下一个字符是实际的汉字/字母/数字（非允许吞噬的标点空白），则绝不吞噬，直接 break！
+          if (stepIndex >= cue.part.length && !swallowableRegex.test(subChars[sci])) {
+            subCharIndex = sci
+            break
+          }
           fullPart = fullPart + subChars[sci]
         }
       }
