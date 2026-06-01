@@ -42,7 +42,7 @@ export async function generateTTS(params: Required<EdgeSchema>, task?: Task): Pr
   const segment: Segment = { id: generateId(`${useLLM ? 'aigen-' : voice}`, text), text }
   const { lang, voiceList } = await getLangConfig(segment.text)
   logger.debug(`Language detected lang: `, lang)
-  validateLangAndVoice(lang, voice)
+  validateLangAndVoice(lang, voice, segment.text)
 
   let result: TTSResult
   if (useLLM) {
@@ -297,9 +297,12 @@ async function runConcurrentTasks(tasks: (() => Promise<any>)[], limit: number):
 /**
  * 验证语言和语音参数
  */
-function validateLangAndVoice(lang: string, voice: string): void {
-  if (lang !== 'eng' && voice.startsWith('en')) {
-    throw new Error(ErrorMessages.ENG_MODEL_INVALID_TEXT)
+function validateLangAndVoice(lang: string, voice: string, text: string): void {
+  if (voice.startsWith('en')) {
+    const hasChinese = /[\u4e00-\u9fa5]/.test(text)
+    if (hasChinese) {
+      throw new Error(ErrorMessages.ENG_MODEL_INVALID_TEXT)
+    }
   }
 }
 

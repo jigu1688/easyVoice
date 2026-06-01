@@ -48,7 +48,7 @@ export async function generateTTSStream(params: Required<EdgeSchema>, task: Task
   task!.context!.lang = lang
   task!.context!.voiceList = voiceList
   const { res } = task.context as Required<NonNullable<Task['context']>>
-  if (!validateLangAndVoice(lang, voice, res)) {
+  if (!validateLangAndVoice(lang, voice, segment.text, res)) {
     task?.endTask?.(task.id)
     return
   }
@@ -360,14 +360,17 @@ async function runConcurrentTasks(tasks: (() => Promise<any>)[], limit: number):
 /**
  * 验证语言和语音参数
  */
-function validateLangAndVoice(lang: string, voice: string, res: Response): boolean {
-  if (lang !== 'eng' && voice.startsWith('en')) {
-    res.status(400).send({
-      code: 400,
-      success: false,
-      message: ErrorMessages.ENG_MODEL_INVALID_TEXT,
-    })
-    return false
+function validateLangAndVoice(lang: string, voice: string, text: string, res: Response): boolean {
+  if (voice.startsWith('en')) {
+    const hasChinese = /[\u4e00-\u9fa5]/.test(text)
+    if (hasChinese) {
+      res.status(400).send({
+        code: 400,
+        success: false,
+        message: ErrorMessages.ENG_MODEL_INVALID_TEXT,
+      })
+      return false
+    }
   }
   return true
 }
