@@ -1651,7 +1651,10 @@ const toggleVoicePreview = async (voice: Voice) => {
   // Not cached, generate on the fly
   previewLoadingVoice.value = voice.Name
   try {
-    const cnName = getCleanVoiceName(voice.Name)
+    let cnName = getCleanVoiceName(voice.Name)
+    if (!voice.Name.startsWith('zh')) {
+      cnName = cnName.replace(/\s*\(.*?\)\s*/g, '').replace(/[\u4e00-\u9fa5]/g, '')
+    }
     const introText = voice.Name.startsWith('zh')
       ? `你好，我是配音员${cnName}，很高兴为您服务，希望你会喜欢我的声音。`
       : `Hi, I am ${cnName}. Nice to meet you, hope you like my voice.`
