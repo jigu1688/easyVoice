@@ -312,25 +312,47 @@
                 </el-select>
               </el-form-item>
 
-              <el-form-item label="语音">
-                <el-select v-model="audioConfig.selectedVoice" placeholder="选择语音" filterable>
-                  <el-option
-                    v-for="voice in filteredVoices"
-                    :key="voice.Name"
-                    :label="voice.cnName"
-                    :value="voice.Name"
+              <el-form-item label="配音员">
+                <div v-if="audioConfig.selectedVoice" class="selected-voice-preview-card" @click="openVoiceMarket('single')">
+                  <div 
+                    class="voice-avatar" 
+                    :style="{ background: getVoiceAvatarBg(audioConfig.selectedVoice) }"
                   >
-                    <div class="voice-option">
-                      <span>{{ voice.cnName || voice.Name }}</span>
-                      <Sparkles
-                        :size="16"
-                        :stroke-width="1.25"
-                        style="margin-left: 10px; color: red"
-                        v-if="voice.Name === 'zh-CN-YunxiNeural'"
-                      />
+                    {{ getVoiceInitial(audioConfig.selectedVoice) }}
+                  </div>
+                  <div class="voice-info">
+                    <div class="voice-name-row">
+                      <span class="voice-cn-name">{{ getCleanVoiceName(audioConfig.selectedVoice) }}</span>
+                      <el-tag 
+                        size="small" 
+                        :type="getVoiceGenderType(audioConfig.selectedVoice)"
+                        class="gender-tag"
+                      >
+                        {{ getVoiceGenderName(audioConfig.selectedVoice) }}
+                      </el-tag>
                     </div>
-                  </el-option>
-                </el-select>
+                    <div class="voice-tags-row">
+                      <span 
+                        v-for="tag in getVoiceTags(audioConfig.selectedVoice)" 
+                        :key="tag" 
+                        class="mini-tag"
+                      >
+                        {{ tag }}
+                      </span>
+                    </div>
+                  </div>
+                  <el-button 
+                    type="primary" 
+                    size="small" 
+                    link 
+                    class="change-voice-link-btn"
+                  >
+                    更换
+                  </el-button>
+                </div>
+                <el-button v-else type="primary" plain style="width: 100%" @click="openVoiceMarket('single')">
+                  选择配音员
+                </el-button>
               </el-form-item>
 
               <el-form-item label="语速">
@@ -438,15 +460,31 @@
                 </template>
 
                 <el-form label-position="top" size="small" style="padding: 10px;">
-                  <el-form-item label="关联语音">
-                    <el-select v-model="config.voice" placeholder="选择语音" filterable style="width: 100%">
-                      <el-option
-                        v-for="voice in betterShowCN(voiceList)"
-                        :key="voice.Name"
-                        :label="voice.cnName"
-                        :value="voice.Name"
-                      />
-                    </el-select>
+                  <el-form-item label="配音员">
+                    <div v-if="config.voice" class="selected-voice-preview-card mini" @click="openVoiceMarket(char as string)">
+                      <div 
+                        class="voice-avatar mini" 
+                        :style="{ background: getVoiceAvatarBg(config.voice) }"
+                      >
+                        {{ getVoiceInitial(config.voice) }}
+                      </div>
+                      <div class="voice-info">
+                        <div class="voice-name-row">
+                          <span class="voice-cn-name">{{ getCleanVoiceName(config.voice) }}</span>
+                        </div>
+                      </div>
+                      <el-button 
+                        type="primary" 
+                        size="small" 
+                        link 
+                        class="change-voice-link-btn"
+                      >
+                        更换
+                      </el-button>
+                    </div>
+                    <el-button v-else type="primary" plain style="width: 100%" @click="openVoiceMarket(char as string)">
+                      选择配音员
+                    </el-button>
                   </el-form-item>
 
                   <el-form-item label="语速">
@@ -587,6 +625,124 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 可视化声音馆对话框 -->
+    <el-dialog
+      v-model="showVoiceMarketDialog"
+      title="可视化配音选择大厅"
+      width="780px"
+      destroy-on-close
+      class="voice-market-dialog"
+    >
+      <div class="voice-market-header">
+        <el-input
+          v-model="marketSearchQuery"
+          placeholder="搜索配音员名字或性格标签（例如：云希、温暖、活泼...）"
+          clearable
+          :prefix-icon="Search"
+          class="market-search-bar"
+        />
+        
+        <div class="market-filters">
+          <div class="filter-group">
+            <span class="filter-label">分类：</span>
+            <el-radio-group v-model="marketCategory" size="small">
+              <el-radio-button label="all">全部</el-radio-button>
+              <el-radio-button label="novel">小说配音</el-radio-button>
+              <el-radio-button label="news">新闻播报</el-radio-button>
+              <el-radio-button label="cartoon">动漫卡通</el-radio-button>
+              <el-radio-button label="dialect">地方方言</el-radio-button>
+              <el-radio-button label="english">英文语音</el-radio-button>
+            </el-radio-group>
+          </div>
+          
+          <div class="filter-group">
+            <span class="filter-label">性别：</span>
+            <el-radio-group v-model="marketGender" size="small">
+              <el-radio-button label="all">全部</el-radio-button>
+              <el-radio-button label="Female">女声</el-radio-button>
+              <el-radio-button label="Male">男声</el-radio-button>
+            </el-radio-group>
+          </div>
+        </div>
+      </div>
+      
+      <div class="voice-market-grid-container">
+        <el-empty 
+          v-if="filteredMarketVoices.length === 0" 
+          description="未找到符合条件的配音员" 
+          :image-size="80" 
+        />
+        
+        <div v-else class="voice-market-grid">
+          <div 
+            v-for="voice in filteredMarketVoices" 
+            :key="voice.Name"
+            class="voice-market-card"
+            :class="{ active: isVoiceSelected(voice.Name) }"
+          >
+            <div 
+              class="card-avatar"
+              :style="{ background: getVoiceAvatarBg(voice.Name) }"
+            >
+              {{ getVoiceInitial(voice.Name) }}
+            </div>
+            
+            <div class="card-content">
+              <div class="card-title-row">
+                <span class="card-cn-name">{{ getCleanVoiceName(voice.Name) }}</span>
+                <el-tag 
+                  size="small" 
+                  :type="getVoiceGenderType(voice.Name)"
+                  class="card-gender-tag"
+                >
+                  {{ getVoiceGenderName(voice.Name) }}
+                </el-tag>
+              </div>
+              <div class="card-technical-id">{{ voice.Name }}</div>
+              
+              <div class="card-tags-row">
+                <span 
+                  v-for="tag in getVoiceTags(voice.Name)" 
+                  :key="tag" 
+                  class="mini-tag"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+            </div>
+            
+            <div class="card-footer-actions">
+              <!-- 试听按钮 -->
+              <el-button 
+                circle
+                size="default"
+                :type="previewPlayingVoice === voice.Name ? 'danger' : 'primary'"
+                :icon="previewLoadingVoice === voice.Name ? Loading : (previewPlayingVoice === voice.Name ? VideoPause : VideoPlay)"
+                @click="toggleVoicePreview(voice)"
+                :loading="previewLoadingVoice === voice.Name"
+                title="试听样品"
+              />
+              
+              <!-- 选择按钮 -->
+              <el-button 
+                type="success"
+                size="small"
+                @click="selectVoiceFromMarket(voice.Name)"
+              >
+                使用
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeVoiceMarket">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -596,7 +752,7 @@ import { Sparkles } from 'lucide-vue-next'
 import { ref, computed, onMounted, watch, onBeforeMount, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useGenerationStore } from '@/stores/generation'
-import { UploadFilled, Service, Setting, ArrowUp, ArrowDown, Plus, Delete, Edit, Check, Close } from '@element-plus/icons-vue'
+import { UploadFilled, Service, Setting, ArrowUp, ArrowDown, Plus, Delete, Edit, Check, Close, Search, VideoPlay, VideoPause, Loading } from '@element-plus/icons-vue'
 import {
   asyncSleep,
   createAudioStreamProcessor,
@@ -635,6 +791,17 @@ const segmentPreviewLoading = ref<Record<string, boolean>>({})
 // Segment editing and management states
 const editingSegmentId = ref<string | null>(null)
 const editingText = ref<string>('')
+
+// Voice Market (声音馆) states
+const showVoiceMarketDialog = ref(false)
+const voiceMarketTarget = ref<'single' | string>('single')
+const marketSearchQuery = ref('')
+const marketCategory = ref('all')
+const marketGender = ref('all')
+const previewPlayingVoice = ref<string | null>(null)
+const previewLoadingVoice = ref<string | null>(null)
+const previewAudioRef = ref<HTMLAudioElement | null>(null)
+const previewCache = ref<Record<string, string>>({})
 
 const showAiSettingsDialog = ref(false)
 const aiProvider = ref('custom')
@@ -1290,6 +1457,231 @@ const deleteSegment = (index: number) => {
   }).catch(() => {})
 }
 
+const getCleanVoiceName = (voiceName: string) => {
+  const cnName = getVoiceCnName(voiceName)
+  return cnName.replace(/^(zh-CN-|zh-HK-|zh-TW-|en-US-|en-GB-|en-AU-|en-CA-)/i, '')
+}
+
+const getVoiceGenderName = (voiceName: string) => {
+  const voice = voiceList.value.find(v => v.Name === voiceName)
+  if (voice) {
+    return voice.Gender === 'Female' ? '女声' : '男声'
+  }
+  return '未知'
+}
+
+const getVoiceGenderType = (voiceName: string) => {
+  const voice = voiceList.value.find(v => v.Name === voiceName)
+  if (voice) {
+    return voice.Gender === 'Female' ? 'danger' : 'primary'
+  }
+  return 'info'
+}
+
+const getVoiceTags = (voiceName: string) => {
+  const voice = voiceList.value.find(v => v.Name === voiceName)
+  if (!voice) return []
+  const tags: string[] = []
+  if (voice.ContentCategories) {
+    voice.ContentCategories.forEach(c => {
+      if (c === 'Novel') tags.push('小说')
+      else if (c === 'News') tags.push('新闻')
+      else if (c === 'Cartoon') tags.push('动漫')
+      else if (c === 'Dialect') tags.push('方言')
+      else if (c === 'General') tags.push('通用')
+      else tags.push(c)
+    })
+  }
+  if (voice.VoicePersonalities) {
+    voice.VoicePersonalities.forEach(p => {
+      if (p === 'Warm') tags.push('温暖')
+      else if (p === 'Lively') tags.push('活泼')
+      else if (p === 'Sunshine') tags.push('阳光')
+      else if (p === 'Cute') tags.push('可爱')
+      else if (p === 'Professional') tags.push('专业')
+      else if (p === 'Reliable') tags.push('靠谱')
+      else if (p === 'Humorous') tags.push('幽默')
+      else if (p === 'Bright') tags.push('明亮')
+      else tags.push(p)
+    })
+  }
+  return tags.slice(0, 3) // Cap at 3 tags
+}
+
+const getVoiceInitial = (voiceName: string) => {
+  const cleanName = getCleanVoiceName(voiceName)
+  return cleanName.charAt(0).toUpperCase()
+}
+
+const getVoiceAvatarBg = (voiceName: string) => {
+  const voice = voiceList.value.find(v => v.Name === voiceName)
+  if (!voice) return 'linear-gradient(135deg, #64748b, #94a3b8)'
+  return voice.Gender === 'Female'
+    ? 'linear-gradient(135deg, #f472b6, #ec4899)' // Pinkish
+    : 'linear-gradient(135deg, #60a5fa, #3b82f6)' // Blueish
+}
+
+const isVoiceSelected = (voiceName: string) => {
+  if (voiceMarketTarget.value === 'single') {
+    return audioConfig.selectedVoice === voiceName
+  }
+  const charConfig = characterMap.value[voiceMarketTarget.value]
+  return charConfig ? charConfig.voice === voiceName : false
+}
+
+const openVoiceMarket = (target: 'single' | string) => {
+  voiceMarketTarget.value = target
+  marketSearchQuery.value = ''
+  marketCategory.value = 'all'
+  marketGender.value = 'all'
+  showVoiceMarketDialog.value = true
+}
+
+const closeVoiceMarket = () => {
+  if (previewAudioRef.value) {
+    previewAudioRef.value.pause()
+  }
+  previewPlayingVoice.value = null
+  showVoiceMarketDialog.value = false
+}
+
+const selectVoiceFromMarket = (voiceName: string) => {
+  if (voiceMarketTarget.value === 'single') {
+    audioConfig.selectedVoice = voiceName
+  } else {
+    const charConfig = characterMap.value[voiceMarketTarget.value]
+    if (charConfig) {
+      charConfig.voice = voiceName
+    }
+  }
+  closeVoiceMarket()
+  ElMessage.success(`已成功选择配音员: ${getCleanVoiceName(voiceName)}`)
+}
+
+const toggleVoicePreview = async (voice: Voice) => {
+  // If clicking on a currently playing voice, pause it
+  if (previewPlayingVoice.value === voice.Name) {
+    if (previewAudioRef.value) {
+      previewAudioRef.value.pause()
+    }
+    previewPlayingVoice.value = null
+    return
+  }
+
+  // Stop any currently playing preview
+  if (previewAudioRef.value) {
+    previewAudioRef.value.pause()
+  }
+  previewPlayingVoice.value = null
+
+  // If already cached, play immediately
+  if (previewCache.value[voice.Name]) {
+    const cachedUrl = previewCache.value[voice.Name]
+    const audio = new Audio(cachedUrl)
+    previewAudioRef.value = audio
+    previewPlayingVoice.value = voice.Name
+    audio.play().catch(err => {
+      console.error('播放缓存试听失败:', err)
+      previewPlayingVoice.value = null
+    })
+    audio.addEventListener('ended', () => {
+      if (previewPlayingVoice.value === voice.Name) {
+        previewPlayingVoice.value = null
+      }
+    })
+    return
+  }
+
+  // Not cached, generate on the fly
+  previewLoadingVoice.value = voice.Name
+  try {
+    const cnName = getCleanVoiceName(voice.Name)
+    const introText = voice.Name.startsWith('zh')
+      ? `你好，我是配音员${cnName}，很高兴为您服务，希望你会喜欢我的声音。`
+      : `Hi, I am ${cnName}. Nice to meet you, hope you like my voice.`
+
+    const params = {
+      text: introText,
+      voice: voice.Name,
+      rate: '+0%',
+      pitch: '+0Hz',
+      volume: '+0%',
+    }
+
+    const { data } = await generateTTS(params)
+    if (data?.audio) {
+      previewCache.value[voice.Name] = data.audio
+      const audio = new Audio(data.audio)
+      previewAudioRef.value = audio
+      previewPlayingVoice.value = voice.Name
+      audio.play().catch(err => {
+        console.error('播放生成试听失败:', err)
+        previewPlayingVoice.value = null
+      })
+      audio.addEventListener('ended', () => {
+        if (previewPlayingVoice.value === voice.Name) {
+          previewPlayingVoice.value = null
+        }
+      })
+    }
+  } catch (error) {
+    console.error('试听加载失败:', error)
+    ElMessage.error('获取试听音频失败，请稍后再试')
+  } finally {
+    previewLoadingVoice.value = null
+  }
+}
+
+const filteredMarketVoices = computed(() => {
+  return voiceList.value.filter(voice => {
+    // 1. Language Filter
+    let langMatch = false
+    if (marketCategory.value === 'english') {
+      langMatch = voice.Name.startsWith('en')
+    } else {
+      langMatch = voice.Name.startsWith(audioConfig.selectedLanguage)
+    }
+    if (!langMatch) return false
+
+    // 2. Gender Filter
+    if (marketGender.value !== 'all' && voice.Gender !== marketGender.value) {
+      return false
+    }
+
+    // 3. Category Filter
+    if (marketCategory.value !== 'all' && marketCategory.value !== 'english') {
+      const categories = voice.ContentCategories || []
+      const nameLower = voice.Name.toLowerCase()
+      if (marketCategory.value === 'novel' && !categories.includes('Novel')) return false
+      if (marketCategory.value === 'news' && !categories.includes('News')) return false
+      if (marketCategory.value === 'cartoon' && !categories.includes('Cartoon')) return false
+      if (marketCategory.value === 'dialect') {
+        const isDialect = categories.includes('Dialect') || nameLower.includes('liaoning') || nameLower.includes('shaanxi') || nameLower.includes('sichuan')
+        if (!isDialect) return false
+      }
+    }
+
+    // 4. Search Query Filter
+    if (marketSearchQuery.value.trim()) {
+      const query = marketSearchQuery.value.trim().toLowerCase()
+      const cnName = getCleanVoiceName(voice.Name).toLowerCase()
+      const techId = voice.Name.toLowerCase()
+      const personalities = (voice.VoicePersonalities || []).map(p => p.toLowerCase())
+      const categories = (voice.ContentCategories || []).map(c => c.toLowerCase())
+      
+      const matchName = cnName.includes(query) || techId.includes(query)
+      const matchTags = personalities.some(p => p.includes(query)) || categories.some(c => c.includes(query))
+      
+      const zhTags = getVoiceTags(voice.Name).map(t => t.toLowerCase())
+      const matchZhTags = zhTags.some(t => t.includes(query))
+      
+      if (!matchName && !matchTags && !matchZhTags) return false
+    }
+
+    return true
+  })
+})
+
 const getVoiceCnName = (voiceName: string) => {
   if (!voiceName) return '未配置声音'
   const voice = voiceList.value.find(v => v.Name === voiceName)
@@ -1912,4 +2304,215 @@ onMounted(async () => {
   color: #3b82f6;
   font-weight: 600;
 }
+
+/* Selected Voice Preview Card */
+.selected-voice-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+.selected-voice-preview-card:hover {
+  border-color: #3b82f6;
+  background: #f1f5f9;
+}
+.selected-voice-preview-card.mini {
+  padding: 6px 10px;
+  gap: 8px;
+  border-radius: 6px;
+  margin-top: 5px;
+}
+.voice-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+.voice-avatar.mini {
+  width: 28px;
+  height: 28px;
+  font-size: 0.8rem;
+}
+.voice-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.voice-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.voice-cn-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+.gender-tag {
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  line-height: 16px;
+}
+.voice-tags-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.mini-tag {
+  font-size: 0.7rem;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.change-voice-link-btn {
+  font-size: 0.8rem !important;
+  font-weight: 500;
+}
+
+/* Voice Market Dialog Styles */
+.voice-market-dialog :deep(.el-dialog__body) {
+  padding: 15px 20px 20px !important;
+}
+.voice-market-header {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+  background: #f8fafc;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+.market-search-bar {
+  width: 100%;
+}
+.market-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filter-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 600;
+  width: 45px;
+  flex-shrink: 0;
+}
+.voice-market-grid-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+.voice-market-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.voice-market-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+.voice-market-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: #cbd5e1;
+}
+.voice-market-card.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+}
+.card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+.card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-cn-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+.card-gender-tag {
+  height: 18px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  line-height: 16px;
+}
+.card-technical-id {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-tags-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.card-footer-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .voice-market-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
+

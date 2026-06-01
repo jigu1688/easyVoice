@@ -7,8 +7,20 @@ const zhVoiceMap = {
   'zh-CN-YunxiNeural': 'zh-CN-云希', // 普通话男声，温和自然
   'zh-CN-YunxiaNeural': 'zh-CN-云夏', // 普通话女声，清新夏日感
   'zh-CN-YunyangNeural': 'zh-CN-云扬', // 普通话男声，阳刚有力
+  'zh-CN-XiaochenNeural': 'zh-CN-晓辰', // 普通话女声
+  'zh-CN-XiaohanNeural': 'zh-CN-晓涵', // 普通话女声
+  'zh-CN-XiaomengNeural': 'zh-CN-晓梦', // 普通话女声
+  'zh-CN-XiaoruNeural': 'zh-CN-晓如', // 普通话女声
+  'zh-CN-XiaoshuangNeural': 'zh-CN-晓双', // 普通话女声
+  'zh-CN-XiaoxuanNeural': 'zh-CN-晓萱', // 普通话女声
+  'zh-CN-XiaoyuNeural': 'zh-CN-晓雨', // 普通话女声
+  'zh-CN-YunfengNeural': 'zh-CN-云枫', // 普通话男声
+  'zh-CN-YunhaoNeural': 'zh-CN-云皓', // 普通话男声
+  'zh-CN-YunjieNeural': 'zh-CN-云杰', // 普通话男声
+  'zh-CN-YunzeNeural': 'zh-CN-云泽', // 普通话男声
   'zh-CN-liaoning-XiaobeiNeural': 'zh-CN-辽宁-晓北', // 辽宁方言女声，亲切东北风
   'zh-CN-shaanxi-XiaoniNeural': 'zh-CN-陕西-晓妮', // 陕西方言女声，带秦腔韵味
+  'zh-CN-sichuan-XiaoyaNeural': 'zh-CN-四川-晓雅', // 四川方言女声，热情泼辣
   'zh-HK-HiuGaaiNeural': 'zh-HK-曉佳', // 粤语女声，优雅港风
   'zh-HK-HiuMaanNeural': 'zh-HK-曉曼', // 粤语女声，温柔细腻
   'zh-HK-WanLungNeural': 'zh-HK-雲龍', // 粤语男声，沉稳有力
