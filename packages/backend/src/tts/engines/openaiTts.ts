@@ -45,8 +45,14 @@ export class OpenAITtsEngine implements TTSEngine {
     }
 
     let targetModel = model
-    if (!isOfficialOpenAI && model === 'tts-1') {
-      targetModel = 'supertonic-3'
+    let targetFormat = format
+    if (!isOfficialOpenAI) {
+      if (model === 'tts-1') {
+        targetModel = 'supertonic-3'
+      }
+      if (format === 'mp3') {
+        targetFormat = 'wav'
+      }
     }
 
     try {
@@ -57,7 +63,7 @@ export class OpenAITtsEngine implements TTSEngine {
           input: text,
           voice,
           speed,
-          response_format: format,
+          response_format: targetFormat,
         },
         {
           headers: {
@@ -65,6 +71,7 @@ export class OpenAITtsEngine implements TTSEngine {
             'Content-Type': 'application/json',
           },
           responseType: 'arraybuffer',
+          timeout: isOfficialOpenAI ? 30000 : 300000, // 30s for official, 5 minutes for local NAS to download models
         }
       )
 
