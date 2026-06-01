@@ -21,7 +21,7 @@ export class OpenAITtsEngine implements TTSEngine {
   }
 
   async synthesize(text: string, options: TtsOptions): Promise<Buffer> {
-    const { speed = 1.0, voice = 'alloy', format = 'mp3' } = options
+    const { speed = 1.0, voice = 'alloy', format = 'mp3', model = 'tts-1' } = options
 
     if (typeof text !== 'string' || text.length === 0) {
       throw new Error('Input text is required.')
@@ -44,11 +44,16 @@ export class OpenAITtsEngine implements TTSEngine {
       )
     }
 
+    let targetModel = model
+    if (!isOfficialOpenAI && model === 'tts-1') {
+      targetModel = 'supertonic-3'
+    }
+
     try {
       const response = await fetcher.post(
         `${this.baseUrl}/audio/speech`,
         {
-          model: 'tts-1',
+          model: targetModel,
           input: text,
           voice,
           speed,

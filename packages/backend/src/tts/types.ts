@@ -1,6 +1,7 @@
 import { Readable } from 'stream'
 
 export interface TtsOptions {
+  model?: string // 模型名称
   speed?: number // 语速，0.25-4.0
   rate?: number // 语速，0.25-4.0
   pitch?: number // 音调，-1.0 到 1.0
