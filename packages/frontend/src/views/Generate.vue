@@ -1656,7 +1656,7 @@ const filteredMarketVoices = computed(() => {
       if (marketCategory.value === 'news' && !categories.includes('News')) return false
       if (marketCategory.value === 'cartoon' && !categories.includes('Cartoon')) return false
       if (marketCategory.value === 'dialect') {
-        const isDialect = categories.includes('Dialect') || nameLower.includes('liaoning') || nameLower.includes('shaanxi') || nameLower.includes('sichuan')
+        const isDialect = categories.includes('Dialect') || nameLower.includes('liaoning') || nameLower.includes('shaanxi')
         if (!isDialect) return false
       }
     }

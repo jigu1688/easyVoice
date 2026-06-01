@@ -37,76 +37,52 @@ export const defaultVoiceList = [
     VoicePersonalities: ["Professional", "Reliable"],
   },
   {
-    Name: "zh-CN-XiaochenNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "Cartoon"],
-    VoicePersonalities: ["Lively", "Bright"]
-  },
-  {
-    Name: "zh-CN-XiaohanNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "News"],
-    VoicePersonalities: ["Warm", "Calm"]
-  },
-  {
-    Name: "zh-CN-XiaomengNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "Cartoon"],
-    VoicePersonalities: ["Cute", "Sweet"]
-  },
-  {
-    Name: "zh-CN-XiaoruNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "General"],
-    VoicePersonalities: ["Warm", "Gentle"]
-  },
-  {
-    Name: "zh-CN-XiaoshuangNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "Cartoon"],
-    VoicePersonalities: ["Cute", "Lively"]
-  },
-  {
-    Name: "zh-CN-XiaoxuanNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "News"],
-    VoicePersonalities: ["Professional", "Calm"]
-  },
-  {
-    Name: "zh-CN-XiaoyuNeural",
-    Gender: "Female",
-    ContentCategories: ["Novel", "General"],
-    VoicePersonalities: ["Warm", "Gentle"]
-  },
-  {
-    Name: "zh-CN-YunfengNeural",
-    Gender: "Male",
-    ContentCategories: ["Novel", "News"],
-    VoicePersonalities: ["Steady", "Reliable"]
-  },
-  {
-    Name: "zh-CN-YunhaoNeural",
-    Gender: "Male",
-    ContentCategories: ["Novel", "General"],
-    VoicePersonalities: ["Warm", "Magnetic"]
-  },
-  {
-    Name: "zh-CN-YunjieNeural",
-    Gender: "Male",
-    ContentCategories: ["Novel", "General"],
-    VoicePersonalities: ["Steady"]
-  },
-  {
-    Name: "zh-CN-YunzeNeural",
-    Gender: "Male",
-    ContentCategories: ["Novel", "General"],
-    VoicePersonalities: ["Warm", "Gentle"]
-  },
-  {
-    Name: "zh-CN-sichuan-XiaoyaNeural",
+    Name: "zh-CN-liaoning-XiaobeiNeural",
     Gender: "Female",
     ContentCategories: ["Dialect"],
-    VoicePersonalities: ["Lively"]
+    VoicePersonalities: ["Humorous"],
+  },
+  {
+    Name: "zh-CN-shaanxi-XiaoniNeural",
+    Gender: "Female",
+    ContentCategories: ["Dialect"],
+    VoicePersonalities: ["Bright"],
+  },
+  {
+    Name: "zh-HK-HiuGaaiNeural",
+    Gender: "Female",
+    ContentCategories: ["General"],
+    VoicePersonalities: ["Friendly", "Positive"],
+  },
+  {
+    Name: "zh-HK-HiuMaanNeural",
+    Gender: "Female",
+    ContentCategories: ["General"],
+    VoicePersonalities: ["Friendly", "Positive"],
+  },
+  {
+    Name: "zh-HK-WanLungNeural",
+    Gender: "Male",
+    ContentCategories: ["General"],
+    VoicePersonalities: ["Friendly", "Positive"],
+  },
+  {
+    Name: "zh-TW-HsiaoChenNeural",
+    Gender: "Female",
+    ContentCategories: ["General"],
+    VoicePersonalities: ["Friendly", "Positive"],
+  },
+  {
+    Name: "zh-TW-HsiaoYuNeural",
+    Gender: "Female",
+    ContentCategories: ["General"],
+    VoicePersonalities: ["Friendly", "Positive"],
+  },
+  {
+    Name: "zh-TW-YunJheNeural",
+    Gender: "Male",
+    ContentCategories: ["General"],
+    VoicePersonalities: ["Friendly", "Positive"],
   },
 ];
 
