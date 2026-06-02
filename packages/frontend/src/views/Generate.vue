@@ -1589,7 +1589,8 @@ const playAudioFromList = async (item: Audio) => {
       const audioBlob = new Blob(item.blobs, { type: mimeType })
       audioUrl = URL.createObjectURL(audioBlob)
     } else if (audioUrl && !audioUrl.startsWith('http') && !audioUrl.startsWith('blob')) {
-      audioUrl = downloadFile(audioUrl)
+      const cleanUrl = audioUrl.startsWith('/') ? audioUrl.slice(1) : audioUrl
+      audioUrl = downloadFile(cleanUrl)
     }
 
     audioEl.src = audioUrl
