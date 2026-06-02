@@ -141,7 +141,11 @@ export async function downloadAudio(req: Request, res: Response): Promise<void> 
 
     await fs.access(filePath, fs.constants.R_OK)
 
-    res.setHeader('Content-Type', `audio/${fileExt.slice(1)}`)
+    if (fileExt === '.srt') {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+    } else {
+      res.setHeader('Content-Type', `audio/${fileExt.slice(1)}`)
+    }
     res.setHeader('Content-Disposition', `attachment; filename="${encodedFileName}"`)
 
     res.download(filePath, safeFileName, (err) => {

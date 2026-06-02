@@ -1589,7 +1589,7 @@ const playAudioFromList = async (item: Audio) => {
       const audioBlob = new Blob(item.blobs, { type: mimeType })
       audioUrl = URL.createObjectURL(audioBlob)
     } else if (audioUrl && !audioUrl.startsWith('http') && !audioUrl.startsWith('blob')) {
-      const cleanUrl = audioUrl.startsWith('/') ? audioUrl.slice(1) : audioUrl
+      const cleanUrl = audioUrl.replace(/^\/+/, '')
       audioUrl = downloadFile(cleanUrl)
     }
 
@@ -2114,7 +2114,10 @@ const previewAudio = async () => {
     const params = buildParams(preparedText)
     const { data } = await generateTTS(params)
     if (data?.audio) {
-      updateConfig('previewAudioUrl', data?.audio)
+      const audioUrl = data.audio
+      const cleanUrl = audioUrl.replace(/^\/+/, '')
+      const fullUrl = cleanUrl.startsWith('http') || cleanUrl.startsWith('blob') ? cleanUrl : downloadFile(cleanUrl)
+      updateConfig('previewAudioUrl', fullUrl)
     }
     playSuccessSound()
     setTimeout(audioPlayer?.value!.play)

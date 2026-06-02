@@ -125,6 +125,8 @@ const commonDownload = (
     const link = document.createElement('a')
     link.target = '_blank'
     link.href = url
+    const filename = file.replace(/^\/+/, '')
+    link.download = filename.includes('/') ? filename.split('/').pop()! : filename
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

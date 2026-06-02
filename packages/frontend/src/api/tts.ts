@@ -186,10 +186,14 @@ export const generateJsonStream = async (data: GenerateJsonRequest) => {
   }
 }
 
-export const downloadFile = (file: string) => `${api.defaults.baseURL}/download/${file}`
+export const downloadFile = (file: string) => {
+  const cleanFile = file.replace(/^\/+/, '')
+  return `${api.defaults.baseURL}/download/${cleanFile}`
+}
 
 export const getSrtFile = async (file: string): Promise<string> => {
-  const response = await api.get<string>(`/download/${file}`, { responseType: 'text' })
+  const cleanFile = file.replace(/^\/+/, '')
+  const response = await api.get<string>(`/download/${cleanFile}`, { responseType: 'text' })
   return response.data
 }
 
