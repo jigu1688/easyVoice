@@ -1,12 +1,12 @@
 services:
   easyvoice:
-    image: cosincox/easyvoice:latest
-    restart: unless-stopped
+    build: .           # ⬅️ 必须添加这一行，表示使用当前目录下的 Dockerfile 进行本地编译！
+    image: easyvoice:local  # ⬅️ 构建出来的本地镜像名称
     container_name: easyvoice
+    restart: unless-stopped
     ports:
       - "9549:3000"
     environment:
       - DEBUG=true
-      - OPENAI_BASE_URL=https://openrouter.ai/api/v1/
     volumes:
       - ./audio:/app/audio
