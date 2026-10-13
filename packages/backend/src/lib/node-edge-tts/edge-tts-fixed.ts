@@ -74,15 +74,23 @@ class EdgeTTS {
   }
 
   async _connectWebSocket(): Promise<WebSocket> {
+    const connId = randomBytes(16).toString('hex')
+    const muid = randomBytes(16).toString('hex').toUpperCase()
     const wsConnect = new WebSocket(
-      `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${generateSecMsGecToken()}&Sec-MS-GEC-Version=1-${CHROMIUM_FULL_VERSION}`,
+      `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TRUSTED_CLIENT_TOKEN}&ConnectionId=${connId}&Sec-MS-GEC=${generateSecMsGecToken()}&Sec-MS-GEC-Version=2-${CHROMIUM_FULL_VERSION}`,
       {
         host: 'speech.platform.bing.com',
         origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
         headers: {
+          Pragma: 'no-cache',
+          'Cache-Control': 'no-cache',
+          Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
           +" (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
           + " Edg/143.0.0.0",
+          'Accept-Encoding': 'gzip, deflate, br, zstd',
+          'Accept-Language': 'en-US,en;q=0.9',
+          Cookie: `muid=${muid};`,
         },
         agent: this.proxy ? new HttpsProxyAgent(this.proxy) : undefined,
       }

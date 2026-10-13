@@ -125,7 +125,9 @@ const commonDownload = (
     const link = document.createElement('a')
     link.target = '_blank'
     link.href = url
-    const filename = file.replace(/^\/+/, '')
+    const filename = file.startsWith('blob')
+      ? `${item.name || title || 'download'}.${title === '字幕' ? 'srt' : 'mp3'}`
+      : file.replace(/^\/+/, '')
     link.download = filename.includes('/') ? filename.split('/').pop()! : filename
     document.body.appendChild(link)
     link.click()
